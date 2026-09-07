@@ -1,5 +1,5 @@
-import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
+import { getSession } from "@/lib/app-user";
 import { parseRole, permissionsFor } from "@/lib/rbac";
 import { hasServiceRoleKey } from "@/lib/supabase-admin";
 import { PageHeader } from "@/components/ui";
@@ -9,7 +9,7 @@ import { PenggunaClient } from "./pengguna-client";
 export const metadata = { title: "Pengguna" };
 
 export default async function PenggunaPage() {
-  const session = await auth();
+  const session = await getSession();
   const perms = permissionsFor(parseRole(session?.user?.role));
   if (!perms.canManageUsers) redirect("/dashboard");
 

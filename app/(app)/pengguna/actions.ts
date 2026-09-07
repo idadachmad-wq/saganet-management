@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { auth } from "@/lib/auth";
+import { getSession } from "@/lib/app-user";
 import { getSupabaseAdmin, hasServiceRoleKey } from "@/lib/supabase-admin";
 import {
   countSuperAdmins,
@@ -22,7 +22,7 @@ export type WorkspaceUser = {
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
 async function requireManager() {
-  const session = await auth();
+  const session = await getSession();
   if (!session?.user) throw new Error("Unauthorized");
   const perms = permissionsFor(parseRole(session.user.role));
   if (!perms.canManageUsers) {

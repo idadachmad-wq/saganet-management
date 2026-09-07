@@ -71,7 +71,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     error: "/login",
   },
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger }) {
+      // Role/name hanya diisi saat login atau session.update — jangan hit DB tiap navigasi
       if (user) {
         token.role = (user as { role?: string }).role;
         token.id = user.id;
@@ -79,20 +80,21 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         return token;
       }
 
-      const userId = typeof token.id === "string" ? token.id : undefined;
-      if (!userId) return token;
-
-      try {
-        const profile = await getProfile(userId);
-        if (!profile) {
-          token.role = undefined;
-          token.id = undefined;
-          return token;
+      if (trigger === "update") {
+        const userId = typeof token.id === "string" ? token.id : undefined;
+        if (!userId) return token;
+        try {
+          const profile = await getProfile(userId);
+          if (!profile) {
+            token.role = undefined;
+            token.id = undefined;
+            return token;
+          }
+          token.role = profile.role;
+          token.name = profile.name || token.name;
+        } catch {
+          // keep previous role if DB briefly unavailable
         }
-        token.role = profile.role;
-        token.name = profile.name || token.name;
-      } catch {
-        // keep previous role if DB briefly unavailable
       }
 
       return token;

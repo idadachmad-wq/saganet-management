@@ -1,7 +1,7 @@
-import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { Providers } from "@/components/providers";
+import { getSession } from "@/lib/app-user";
 import { parseRole, permissionsFor } from "@/lib/rbac";
 
 export default async function AppLayout({
@@ -9,7 +9,7 @@ export default async function AppLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const session = await auth();
+  const session = await getSession();
   if (!session?.user) {
     redirect("/login");
   }

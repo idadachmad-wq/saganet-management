@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { auth } from "@/lib/auth";
 import { parseRole, permissionsFor, type Permissions } from "@/lib/rbac";
 import type { Role } from "@/lib/types";
@@ -9,8 +10,11 @@ export type AppUser = {
   role: Role;
 };
 
+/** Satu decode session per RSC request (layout + page). */
+export const getSession = cache(() => auth());
+
 export async function requireSessionUser(): Promise<AppUser> {
-  const session = await auth();
+  const session = await getSession();
   if (!session?.user?.id) {
     throw new Error("Unauthorized");
   }

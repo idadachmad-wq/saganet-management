@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { APP_NAME, NAV_ITEMS } from "@/lib/constants";
 import { SignOutButton } from "@/components/sign-out-button";
@@ -120,7 +120,9 @@ export function AppShell({
   canManageUsers: boolean;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [navigating, setNavigating] = useState(false);
   const navItems = NAV_ITEMS.filter(
     (item) =>
       (!item.finance || canViewFinance) && (!item.users || canManageUsers),
@@ -128,16 +130,28 @@ export function AppShell({
 
   useEffect(() => {
     setMenuOpen(false);
+    setNavigating(false);
   }, [pathname]);
 
   useEffect(() => {
     if (!menuOpen) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    for (const item of navItems) {
+      router.prefetch(item.href);
+    }
     return () => {
       document.body.style.overflow = prev;
     };
-  }, [menuOpen]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- prefetch when drawer opens
+  }, [menuOpen, router]);
+
+  function onNavClick(href: string) {
+    setMenuOpen(false);
+    if (pathname !== href && !pathname.startsWith(`${href}/`)) {
+      setNavigating(true);
+    }
+  }
 
   return (
     <div className="relative min-h-screen">
@@ -172,6 +186,7 @@ export function AppShell({
                 <Link
                   key={item.href}
                   href={item.href}
+                  onClick={() => onNavClick(item.href)}
                   className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition ${
                     active
                       ? "nav-active"
@@ -207,12 +222,20 @@ export function AppShell({
           style={{ background: "var(--main-bg)" }}
         >
           <header
-            className="sticky top-0 z-30 border-b border-[var(--border)] px-4 py-3 backdrop-blur-md sm:px-6 lg:px-8"
+            className="sticky top-0 z-30 border-b border-[var(--border)] px-4 py-3 sm:px-6 lg:px-8"
             style={{
               background: "var(--header-bg)",
               paddingTop: "max(0.75rem, env(safe-area-inset-top))",
             }}
           >
+            {navigating ? (
+              <div
+                className="absolute inset-x-0 bottom-0 h-0.5 overflow-hidden"
+                aria-hidden
+              >
+                <div className="h-full w-1/3 animate-pulse bg-[var(--brand)]" />
+              </div>
+            ) : null}
             <div className="flex items-center justify-between gap-3">
               <div className="flex min-w-0 items-center gap-2.5 lg:hidden">
                 <button
@@ -298,6 +321,7 @@ export function AppShell({
                       <Link
                         key={item.href}
                         href={item.href}
+                        onClick={() => onNavClick(item.href)}
                         className={`flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold ${
                           active
                             ? "nav-active"
@@ -331,7 +355,9 @@ export function AppShell({
           ) : null}
 
           <main
-            className="mx-auto w-full max-w-6xl flex-1 px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-7"
+            className={`mx-auto w-full max-w-6xl flex-1 px-4 py-4 transition-opacity sm:px-6 sm:py-6 lg:px-8 lg:py-7 ${
+              navigating ? "opacity-60" : "opacity-100"
+            }`}
             style={{
               paddingBottom: "max(1.25rem, env(safe-area-inset-bottom))",
             }}

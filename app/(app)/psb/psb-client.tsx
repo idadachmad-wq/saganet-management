@@ -11,7 +11,7 @@ import { PSB_STATUS_LABELS } from "@/lib/constants";
 import { formatRp } from "@/lib/bagi-hasil";
 import type { PsbOrder } from "@/lib/types";
 import { NumberInput } from "@/components/number-input";
-import { PsbMonthlyChart } from "@/components/psb/psb-monthly-chart";
+import { PsbMonthlyChart } from "@/components/psb/psb-monthly-chart-lazy";
 import { format, startOfMonth, subMonths } from "date-fns";
 import { id as localeId } from "date-fns/locale";
 

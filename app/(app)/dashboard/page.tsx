@@ -7,7 +7,7 @@ import {
 } from "@/lib/db";
 import { getSessionPermissions } from "@/lib/app-user";
 import { PageHeader, KpiCard } from "@/components/ui";
-import { RevenueChart } from "@/components/dashboard/revenue-chart";
+import { RevenueChart } from "@/components/dashboard/revenue-chart-lazy";
 import {
   calculateProfitShare,
   DEFAULT_RATES,
