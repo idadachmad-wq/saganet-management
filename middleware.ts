@@ -4,7 +4,23 @@ import { parseRole, permissionsFor } from "@/lib/rbac";
 
 export default auth((req) => {
   const { pathname } = req.nextUrl;
-  const user = req.auth?.user;
+
+  // Auth.js config error (mis. AUTH_SECRET kosong) → jangan anggap login
+  const authPayload = req.auth as
+    | { user?: { id?: string; role?: string }; message?: string }
+    | null
+    | undefined;
+  if (authPayload && typeof authPayload.message === "string") {
+    if (pathname.startsWith("/login") || pathname.startsWith("/api/auth")) {
+      return NextResponse.next();
+    }
+    const url = req.nextUrl.clone();
+    url.pathname = "/login";
+    url.searchParams.set("error", "Configuration");
+    return NextResponse.redirect(url);
+  }
+
+  const user = authPayload?.user;
   const isLoggedIn = !!(user?.id && user.role);
 
   const isPublic =
@@ -24,7 +40,7 @@ export default auth((req) => {
     return NextResponse.redirect(url);
   }
 
-  if (isLoggedIn) {
+  if (isLoggedIn && user) {
     const perms = permissionsFor(parseRole(user.role));
     const isFinanceRoute =
       pathname.startsWith("/keuangan") || pathname.startsWith("/bagi-hasil");

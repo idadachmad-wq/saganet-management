@@ -15,7 +15,7 @@ function createAuthSupabaseClient() {
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
   if (!url || !key) {
     throw new Error(
-      "Set NEXT_PUBLIC_SUPABASE_URL dan NEXT_PUBLIC_SUPABASE_ANON_KEY di file .env",
+      "Set NEXT_PUBLIC_SUPABASE_URL dan NEXT_PUBLIC_SUPABASE_ANON_KEY di Vercel Environment Variables, lalu Redeploy.",
     );
   }
   return createClient(url, key, {
@@ -24,8 +24,10 @@ function createAuthSupabaseClient() {
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  // Wajib di Vercel: AUTH_SECRET (Secret) + AUTH_TRUST_HOST=true (atau biarkan trustHost di sini)
   trustHost: true,
-  secret: process.env.AUTH_SECRET,
+  secret:
+    process.env.AUTH_SECRET?.trim() || process.env.NEXTAUTH_SECRET?.trim(),
   providers: [
     Credentials({
       credentials: {
@@ -36,12 +38,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const parsed = credentialsSchema.safeParse(credentials);
         if (!parsed.success) return null;
 
-        const { data, error } = await createAuthSupabaseClient().auth.signInWithPassword(
-          {
+        const { data, error } =
+          await createAuthSupabaseClient().auth.signInWithPassword({
             email: parsed.data.email,
             password: parsed.data.password,
-          },
-        );
+          });
 
         if (error || !data.user) return null;
 
@@ -59,7 +60,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             role: parseRole(profile.role),
           };
         } catch {
-          // Jangan escalate ke super_admin — gagalkan login
           return null;
         }
       },
@@ -68,6 +68,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: "jwt" },
   pages: {
     signIn: "/login",
+    error: "/login",
   },
   callbacks: {
     async jwt({ token, user }) {
@@ -84,7 +85,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       try {
         const profile = await getProfile(userId);
         if (!profile) {
-          // Profil hilang / dicabut → invalidate session
           token.role = undefined;
           token.id = undefined;
           return token;
@@ -92,7 +92,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.role = profile.role;
         token.name = profile.name || token.name;
       } catch {
-        // Biarkan role lama jika DB sementara gagal; jangan escalate
+        // keep previous role if DB briefly unavailable
       }
 
       return token;

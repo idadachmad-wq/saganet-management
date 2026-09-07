@@ -1,16 +1,26 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { APP_NAME } from "@/lib/constants";
 import { ThemeToggle } from "@/components/theme-toggle";
 
-export default function LoginPage() {
+function configErrorMessage(code: string | null) {
+  if (code === "Configuration") {
+    return "Konfigurasi Auth belum lengkap. Di Vercel: set AUTH_SECRET (Secret), lalu Redeploy.";
+  }
+  return "";
+}
+
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError] = useState(
+    () => configErrorMessage(searchParams.get("error")),
+  );
   const [loading, setLoading] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
@@ -30,7 +40,9 @@ export default function LoginPage() {
       setError(
         result.error === "CredentialsSignin"
           ? "Email atau password salah, atau URL/anon key Supabase tidak cocok."
-          : "Login gagal. Cek .env (URL dan anon key harus dari project yang sama).",
+          : result.error === "Configuration"
+            ? configErrorMessage("Configuration")
+            : "Login gagal. Cek environment variables di Vercel (Supabase URL, anon key, AUTH_SECRET).",
       );
       return;
     }
@@ -110,5 +122,19 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center text-sm text-[var(--muted)]">
+          Memuat...
+        </div>
+      }
+    >
+      <LoginForm />
+    </Suspense>
   );
 }
