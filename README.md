@@ -34,34 +34,34 @@ Buka `http://localhost:3000/login`.
 
 Repo: [idadachmad-wq/saganet-management](https://github.com/idadachmad-wq/saganet-management)
 
-### 1. Environment Variables di Vercel
+### Reset dari nol (jika error terus)
 
-Project → **Settings → Environment Variables**. Centang **Production** (dan Preview jika perlu).
+1. Buka project lama → **Settings → General** → paling bawah → **Delete Project** → ketik nama project.
+2. Buka [vercel.com/new](https://vercel.com/new) → Import `saganet-management`.
+3. Sebelum Deploy, isi **Environment Variables** (semua 6 baris sekaligus). Salin dari `.env` lokal.
+4. **Penting:** jangan centang *Sensitive/Secret* untuk `NEXT_PUBLIC_*` (harus tersedia saat build). Secret hanya untuk `SUPABASE_SERVICE_ROLE_KEY` dan `AUTH_SECRET`.
+5. Deploy. Setelah domain tahu, set `AUTH_URL` = URL production, lalu Redeploy.
 
-| Name | Nilai | Tipe di Vercel |
+Atau lewat CLI (setelah `npx vercel login` + `npx vercel link`):
+
+```bash
+chmod +x scripts/vercel-reset-env.sh
+./scripts/vercel-reset-env.sh
+npx vercel --prod
+```
+
+### Environment Variables
+
+| Name | Nilai | Sensitive? |
 | --- | --- | --- |
-| `NEXT_PUBLIC_SUPABASE_URL` | URL project Supabase | **Environment** (bukan Secret) |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | anon / publishable key | **Environment** |
-| `SUPABASE_SERVICE_ROLE_KEY` | service_role / `sb_secret_...` | **Secret** |
-| `AUTH_SECRET` | `openssl rand -base64 32` | **Secret** (wajib) |
-| `AUTH_TRUST_HOST` | `true` | **Environment** |
-| `AUTH_URL` | `https://saganet-management.vercel.app` | **Environment** (opsional, disarankan) |
+| `NEXT_PUBLIC_SUPABASE_URL` | URL project Supabase | **Tidak** |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | anon / publishable key | **Tidak** |
+| `SUPABASE_SERVICE_ROLE_KEY` | `sb_secret_...` / service_role | **Ya** |
+| `AUTH_SECRET` | dari `.env` (wajib) | **Ya** |
+| `AUTH_TRUST_HOST` | `true` | Tidak |
+| `AUTH_URL` | `https://….vercel.app` | Tidak |
 
-Tanpa `AUTH_SECRET`, halaman login menampilkan error **Configuration** / "Server configuration".
-
-Jangan commit file `.env`. Salin nilai dari `.env` lokal ke dashboard Vercel saja.
-
-### 2. Deploy / Redeploy
-
-- Import repo di [vercel.com/new](https://vercel.com/new) (Framework: Next.js), **atau**
-- Push ke `main` — Vercel auto-deploy jika project sudah terhubung.
-- Setelah mengubah env: **Deployments → Redeploy** (jangan hanya refresh browser).
-
-### 3. Setelah live
-
-- Pastikan schema Supabase sudah dijalankan (sama seperti lokal).
-- Login dengan akun yang ada di Supabase Auth.
-- Domain custom: Project → Settings → Domains.
+Tanpa `AUTH_SECRET` → error login **Configuration**. Setelah ubah env → **Redeploy**.
 
 ## Peran
 
