@@ -2,7 +2,7 @@ import { auth } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { parseRole, permissionsFor } from "@/lib/rbac";
 
-export default auth((req) => {
+export const proxy = auth((req) => {
   const { pathname } = req.nextUrl;
 
   // Auth.js config error (mis. AUTH_SECRET kosong) → jangan anggap login

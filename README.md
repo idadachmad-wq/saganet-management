@@ -12,7 +12,7 @@ Stack: **Next.js** (App Router) + **Supabase** + **Auth.js**.
 NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_or_publishable_key
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_or_sb_secret_key
-AUTH_SECRET=<hasil: openssl rand -base64 32>
+AUTH_SECRET=<hasil: openssl rand -hex 32>
 AUTH_TRUST_HOST=true
 ```
 
@@ -63,6 +63,16 @@ npx vercel --prod
 
 Tanpa `AUTH_SECRET` → error login **Configuration**. Setelah ubah env → **Redeploy**.
 
+Sebelum deploy, pastikan build lokal hijau:
+
+```bash
+npm run build
+```
+
+## Mobile offline (APK)
+
+Klien lapangan offline-first (PSB + pelanggan) ada di folder [`mobile/`](mobile/). Lihat [`mobile/README.md`](mobile/README.md) untuk setup Flutter dan `flutter build apk`.
+
 ## Peran
 
 | Peran | Akses |
@@ -82,7 +92,8 @@ Tanpa `AUTH_SECRET` → error login **Configuration**. Setelah ubah env → **Re
 - Dashboard, PSB, Pelanggan, Keuangan, Bagi Hasil ISP, Pengguna
 - Search/filter di PSB, Pelanggan, dan Keuangan
 - Export CSV laporan keuangan & bagi hasil
-- PWA manifest; wrapping APK (Capacitor) ditunda
+- PWA manifest
+- APK offline Flutter: lihat [`mobile/README.md`](mobile/README.md)
 
 ## Scripts
 
