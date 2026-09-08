@@ -1,5 +1,4 @@
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:sqflite/sqflite.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:saganet_mobile/data/local_db.dart';
 import 'package:saganet_mobile/data/models.dart';
@@ -38,7 +37,6 @@ class SyncEngine {
       await _pushPsb(client);
       await _pullCustomers(client);
       await _pullPsb(client);
-      await _pullPartners(client);
       lastSyncAt = DateTime.now().toUtc().toIso8601String();
       await _db.setMeta('last_sync_at', lastSyncAt!);
       status = SyncStatus.ok;
@@ -96,7 +94,7 @@ class SyncEngine {
         wifiSsid: map['wifi_ssid'] as String?,
         pppoeUser: map['pppoe_user'] as String?,
         status: (map['status'] as String?) ?? 'aktif',
-        ispPartnerId: map['isp_partner_id'] as String?,
+        ispPartnerId: null,
         installedAt: map['installed_at'] as String?,
         createdAt:
             map['created_at'] as String? ?? DateTime.now().toUtc().toIso8601String(),
@@ -140,7 +138,7 @@ class SyncEngine {
         wifiPassword: map['wifi_password'] as String?,
         status: (map['status'] as String?) ?? 'lead',
         notes: map['notes'] as String?,
-        ispPartnerId: map['isp_partner_id'] as String?,
+        ispPartnerId: null,
         customerId: map['customer_id'] as String?,
         createdAt:
             map['created_at'] as String? ?? DateTime.now().toUtc().toIso8601String(),
@@ -154,27 +152,6 @@ class SyncEngine {
       } else if (_isRemoteNewer(remote.updatedAt, local.updatedAt)) {
         await _db.upsertPsb(remote);
       }
-    }
-  }
-
-  Future<void> _pullPartners(SupabaseClient client) async {
-    final rows = await client.from('isp_partners').select();
-    final db = await _db.database;
-    for (final raw in rows as List) {
-      final map = Map<String, dynamic>.from(raw as Map);
-      await db.insert(
-        'isp_partners',
-        {
-          'id': map['id'],
-          'name': map['name'],
-          'code': map['code'],
-          'phone': map['phone'],
-          'active': (map['active'] == true || map['active'] == 1) ? 1 : 0,
-          'updated_at':
-              map['updated_at'] ?? DateTime.now().toUtc().toIso8601String(),
-        },
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
     }
   }
 

@@ -15,21 +15,6 @@ const supabase = createClient(url, key, {
 });
 
 async function main() {
-  const { data: existingIsp } = await supabase
-    .from("isp_partners")
-    .select("id")
-    .eq("code", "ISP-01")
-    .maybeSingle();
-
-  if (!existingIsp) {
-    const { error } = await supabase.from("isp_partners").insert({
-      code: "ISP-01",
-      name: "Mitra Fiber Prima",
-      phone: "081234567890",
-    });
-    if (error) throw error;
-  }
-
   await supabase.from("profit_share_settings").delete().neq("id", "");
   const { error: settingError } = await supabase
     .from("profit_share_settings")
@@ -41,8 +26,8 @@ async function main() {
     });
   if (settingError) throw settingError;
 
-  console.log("Seed selesai: mitra ISP + skema bagi hasil.");
-  console.log("Tidak mengisi pelanggan/PSB/keuangan demo.");
+  console.log("Seed selesai: skema bagi hasil.");
+  console.log("Tidak mengisi mitra ISP / pelanggan / PSB / keuangan demo.");
 }
 
 main().catch((e) => {

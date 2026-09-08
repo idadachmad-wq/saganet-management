@@ -5,7 +5,6 @@ import {
   createCustomer,
   createPsb,
   deletePsb,
-  getActiveIspPartner,
   getCustomer,
   updateCustomer,
   updatePsb,
@@ -77,7 +76,6 @@ function customerPayloadFromPsb(order: PsbOrder) {
     wifi_ssid: order.wifiSsid,
     pppoe_user: order.pppoeUser,
     status: "aktif" as const,
-    isp_partner_id: order.ispPartnerId,
     installed_at: order.installDate
       ? new Date(order.installDate).toISOString()
       : new Date().toISOString(),
@@ -100,13 +98,9 @@ async function ensureCustomerFromPsb(order: PsbOrder): Promise<Customer> {
 
 export async function createPsbOrder(formData: FormData) {
   await requirePsbMutate();
-  const partner = await getActiveIspPartner();
   const payload = parsePsbForm(formData);
 
-  let order = await createPsb({
-    ...payload,
-    isp_partner_id: partner?.id ?? null,
-  });
+  let order = await createPsb(payload);
 
   if (order.status === "aktif") {
     await ensureCustomerFromPsb(order);

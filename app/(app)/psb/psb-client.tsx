@@ -201,7 +201,6 @@ export function PsbClient({
                   "pppoe",
                   "status",
                   "catatan",
-                  "isp",
                 ],
                 filteredOrders.map((o) => ({
                   nama: o.customerName,
@@ -219,7 +218,6 @@ export function PsbClient({
                   pppoe: o.pppoeUser ?? "",
                   status: PSB_STATUS_LABELS[o.status] ?? o.status,
                   catatan: o.notes ?? "",
-                  isp: o.ispPartner?.name ?? "",
                 })),
               );
             }}

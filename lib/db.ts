@@ -110,21 +110,10 @@ function mapSetting(row: Record<string, unknown>): ProfitShareSetting {
   };
 }
 
-export async function getActiveIspPartner() {
-  const { data, error } = await getSupabase()
-    .from("isp_partners")
-    .select("*")
-    .eq("active", true)
-    .limit(1)
-    .maybeSingle();
-  throwIfError(error);
-  return data ? mapPartner(data) : null;
-}
-
 export async function listPsbOrders() {
   const { data, error } = await getSupabase()
     .from("psb_orders")
-    .select("*, isp_partners(*)")
+    .select("*")
     .order("created_at", { ascending: false });
   throwIfError(error);
   return (data ?? []).map((row) => mapPsb(row as Record<string, unknown>));
