@@ -9,6 +9,7 @@ import {
 } from "./actions";
 import { PSB_STATUS_LABELS } from "@/lib/constants";
 import { formatRp } from "@/lib/bagi-hasil";
+import { downloadCsv } from "@/lib/export-csv";
 import type { PsbOrder } from "@/lib/types";
 import { NumberInput } from "@/components/number-input";
 import { PsbMonthlyChart } from "@/components/psb/psb-monthly-chart-lazy";
@@ -179,16 +180,63 @@ export function PsbClient({
             {filteredOrders.length} dari {orders.length} data PSB
           </p>
         </div>
-        {canMutate ? (
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
           <button
-            className="btn btn-primary w-full sm:w-auto"
-            onClick={() => (showForm && !editing ? closeForm() : openCreate())}
+            type="button"
+            className="btn btn-ghost w-full sm:w-auto"
+            onClick={() => {
+              downloadCsv(
+                `psb-${statusFilter}-${new Date().toISOString().slice(0, 10)}.csv`,
+                [
+                  "nama",
+                  "nik",
+                  "telepon",
+                  "alamat",
+                  "paket",
+                  "harga_paket",
+                  "fee",
+                  "tgl_pasang",
+                  "jarak_kabel",
+                  "ssid",
+                  "pppoe",
+                  "status",
+                  "catatan",
+                  "isp",
+                ],
+                filteredOrders.map((o) => ({
+                  nama: o.customerName,
+                  nik: o.nik ?? "",
+                  telepon: o.phone ?? "",
+                  alamat: o.address,
+                  paket: o.packageName ?? "",
+                  harga_paket: o.packagePrice,
+                  fee: o.fee,
+                  tgl_pasang: o.installDate
+                    ? String(o.installDate).slice(0, 10)
+                    : "",
+                  jarak_kabel: o.cableDistance ?? "",
+                  ssid: o.wifiSsid ?? "",
+                  pppoe: o.pppoeUser ?? "",
+                  status: PSB_STATUS_LABELS[o.status] ?? o.status,
+                  catatan: o.notes ?? "",
+                  isp: o.ispPartner?.name ?? "",
+                })),
+              );
+            }}
           >
-            {showForm && !editing ? "Tutup Form" : "Tambah PSB"}
+            Export CSV
           </button>
-        ) : (
-          <p className="text-sm text-[var(--muted)]">Mode lihat saja</p>
-        )}
+          {canMutate ? (
+            <button
+              className="btn btn-primary w-full sm:w-auto"
+              onClick={() => (showForm && !editing ? closeForm() : openCreate())}
+            >
+              {showForm && !editing ? "Tutup Form" : "Tambah PSB"}
+            </button>
+          ) : (
+            <p className="text-sm text-[var(--muted)]">Mode lihat saja</p>
+          )}
+        </div>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">

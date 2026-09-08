@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import { CUSTOMER_STATUS_LABELS } from "@/lib/constants";
 import { formatRp } from "@/lib/bagi-hasil";
+import { downloadCsv } from "@/lib/export-csv";
 import type { Customer } from "@/lib/types";
 import { NumberInput } from "@/components/number-input";
 import {
@@ -127,6 +128,49 @@ export function PelangganClient({
             ))}
           </select>
         </div>
+      </div>
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-sm text-[var(--muted)]">
+          {filtered.length} dari {customers.length} pelanggan
+        </p>
+        <button
+          type="button"
+          className="btn btn-ghost w-full sm:w-auto"
+          onClick={() => {
+            downloadCsv(
+              `pelanggan-${statusFilter}-${new Date().toISOString().slice(0, 10)}.csv`,
+              [
+                "nama",
+                "nik",
+                "telepon",
+                "alamat",
+                "paket",
+                "bulanan",
+                "ssid",
+                "pppoe",
+                "status",
+                "terpasang",
+              ],
+              filtered.map((c) => ({
+                nama: c.name,
+                nik: c.nik ?? "",
+                telepon: c.phone ?? "",
+                alamat: c.address ?? "",
+                paket: c.packageName ?? "",
+                bulanan: c.monthlyFee,
+                ssid: c.wifiSsid ?? "",
+                pppoe: c.pppoeUser ?? "",
+                status: CUSTOMER_STATUS_LABELS[c.status] ?? c.status,
+                terpasang: c.installedAt
+                  ? c.installedAt.slice(0, 10)
+                  : "",
+              })),
+            );
+          }}
+        >
+          Export CSV
+        </button>
       </div>
 
       {editing && canMutate ? (
