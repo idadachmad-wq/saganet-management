@@ -79,6 +79,7 @@ export function KeuanganClient({
   const [monthFilter, setMonthFilter] = useState(() =>
     format(new Date(), "yyyy-MM"),
   );
+  const [allMonths, setAllMonths] = useState(false);
 
   const isRingkasan = tab === "ringkasan";
   const tabMeta = isRingkasan
@@ -86,19 +87,20 @@ export function KeuanganClient({
     : FINANCE_TABS.find((t) => t.key === tab)!;
 
   const monthLabel = useMemo(() => {
+    if (allMonths) return "Semua bulan";
     const [y, m] = monthFilter.split("-").map(Number);
     if (!y || !m) return monthFilter;
     return format(new Date(y, m - 1, 1), "MMM yyyy", { locale: localeId });
-  }, [monthFilter]);
+  }, [allMonths, monthFilter]);
 
   const monthEntries = useMemo(() => {
     return entries
-      .filter((e) => inMonth(e.occurredAt, monthFilter))
+      .filter((e) => (allMonths ? true : inMonth(e.occurredAt, monthFilter)))
       .sort(
         (a, b) =>
           new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime(),
       );
-  }, [entries, monthFilter]);
+  }, [entries, monthFilter, allMonths]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -185,7 +187,7 @@ export function KeuanganClient({
       total: e.amount,
     }));
     downloadCsv(
-      `keuangan-${tab}-${monthFilter}.csv`,
+      `keuangan-${tab}-${allMonths ? "semua" : monthFilter}.csv`,
       [
         "tanggal",
         "kategori",
@@ -323,13 +325,27 @@ export function KeuanganClient({
           <label className="label" htmlFor="finance-month">
             Bulan transaksi
           </label>
-          <input
-            id="finance-month"
-            className="input"
-            type="month"
-            value={monthFilter}
-            onChange={(e) => setMonthFilter(e.target.value)}
-          />
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <input
+              id="finance-month"
+              className="input"
+              type="month"
+              value={monthFilter}
+              disabled={allMonths}
+              onChange={(e) => {
+                setAllMonths(false);
+                setMonthFilter(e.target.value);
+              }}
+            />
+            <button
+              type="button"
+              className={`tab-chip shrink-0 ${allMonths ? "tab-chip-active" : ""}`}
+              onClick={() => setAllMonths((v) => !v)}
+              aria-pressed={allMonths}
+            >
+              Semua bulan
+            </button>
+          </div>
         </div>
         <div>
           <label className="label" htmlFor="finance-search">
