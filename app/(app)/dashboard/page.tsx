@@ -1,8 +1,8 @@
 import {
-  countActiveCustomers,
-  countOpenPsb,
   getProfitShareSetting,
+  listCustomers,
   listFinanceSince,
+  listPsbOrders,
   listRecentPsb,
 } from "@/lib/db";
 import { getSessionPermissions } from "@/lib/app-user";
@@ -20,7 +20,8 @@ import { id as localeId } from "date-fns/locale";
 
 export const metadata = { title: "Dashboard" };
 
-function occurredMonth(iso: string) {
+function occurredMonth(iso?: string | null) {
+  if (!iso) return null;
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
   return format(d, "yyyy-MM");
@@ -43,10 +44,10 @@ export default async function DashboardPage({
   const chartStart = startOfMonth(subMonths(selectedMonth, 5));
   const monthLabel = format(selectedMonth, "MMMM yyyy", { locale: localeId });
 
-  const [activeCustomers, openPsb, setting, recentPsb, financeAll] =
+  const [customers, psbOrders, setting, recentPsb, financeAll] =
     await Promise.all([
-      countActiveCustomers(),
-      countOpenPsb(),
+      listCustomers(),
+      listPsbOrders(),
       perms.canViewFinance ? getProfitShareSetting() : Promise.resolve(null),
       listRecentPsb(5),
       perms.canViewFinance
@@ -54,6 +55,19 @@ export default async function DashboardPage({
         : Promise.resolve([]),
     ]);
 
+  const activeCustomers = customers.filter(
+    (c) =>
+      c.status === "aktif" && occurredMonth(c.installedAt) === monthValue,
+  ).length;
+
+  const openPsb = psbOrders.filter((o) => {
+    if (!["lead", "survey", "install"].includes(o.status)) return false;
+    const key =
+      occurredMonth(o.installDate) ||
+      occurredMonth(o.installAt) ||
+      occurredMonth(o.createdAt);
+    return key === monthValue;
+  }).length;
   const monthInvoices = financeAll.filter(
     (e) =>
       e.category === "invoice" &&
@@ -123,13 +137,13 @@ export default async function DashboardPage({
         <KpiCard
           label="Pelanggan Aktif"
           value={String(activeCustomers)}
-          hint="Semua customer aktif"
+          hint={`Terpasang ${monthLabel}`}
           accent="cyan"
         />
         <KpiCard
           label="PSB Berjalan"
           value={String(openPsb)}
-          hint="Lead / survey / install"
+          hint={`Lead / survey / install · ${monthLabel}`}
           accent="orange"
         />
         {perms.canViewFinance ? (
