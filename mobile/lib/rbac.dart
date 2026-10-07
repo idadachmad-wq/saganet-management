@@ -26,12 +26,14 @@ class Permissions {
   final AppRole role;
   final bool canMutatePsb;
   final bool canViewFinance;
+  final bool canMutateFinance;
   final bool canManageUsers;
 
   const Permissions({
     required this.role,
     required this.canMutatePsb,
     required this.canViewFinance,
+    required this.canMutateFinance,
     required this.canManageUsers,
   });
 
@@ -40,6 +42,7 @@ class Permissions {
       role: role,
       canMutatePsb: role == AppRole.superAdmin || role == AppRole.teknisi,
       canViewFinance: role == AppRole.superAdmin || role == AppRole.admin,
+      canMutateFinance: role == AppRole.superAdmin,
       canManageUsers: role == AppRole.superAdmin,
     );
   }

@@ -1,0 +1,4 @@
+storeFile=../upload-keystore.jks
+storePassword=GANTI_PASSWORD_KEYSTORE
+keyAlias=upload
+keyPassword=GANTI_PASSWORD_ALIAS

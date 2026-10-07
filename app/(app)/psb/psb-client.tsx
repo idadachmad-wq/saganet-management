@@ -56,10 +56,27 @@ export function PsbClient({
   const [formError, setFormError] = useState("");
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [monthFilter, setMonthFilter] = useState(() =>
+    format(new Date(), "yyyy-MM"),
+  );
+
+  const monthLabel = useMemo(() => {
+    const [y, m] = monthFilter.split("-").map(Number);
+    if (!y || !m) return monthFilter;
+    return format(new Date(y, m - 1, 1), "MMM yyyy", { locale: localeId });
+  }, [monthFilter]);
+
+  const monthOrders = useMemo(() => {
+    return orders.filter((order) => {
+      const date = installDateOf(order);
+      if (!date) return false;
+      return format(date, "yyyy-MM") === monthFilter;
+    });
+  }, [orders, monthFilter]);
 
   const filteredOrders = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return orders.filter((order) => {
+    return monthOrders.filter((order) => {
       if (statusFilter !== "all" && order.status !== statusFilter) return false;
       if (!q) return true;
       const hay = [
@@ -77,11 +94,11 @@ export function PsbClient({
         .toLowerCase();
       return hay.includes(q);
     });
-  }, [orders, query, statusFilter]);
+  }, [monthOrders, query, statusFilter]);
 
   const summary = useMemo(() => {
-    const aktif = orders.filter((o) => o.status === "aktif");
-    const installed = orders.filter(
+    const aktif = monthOrders.filter((o) => o.status === "aktif");
+    const installed = monthOrders.filter(
       (o) =>
         o.status === "aktif" ||
         o.status === "install" ||
@@ -150,8 +167,9 @@ export function PsbClient({
       terpasang,
       chart,
       hasInstallMonths: withInstalls.length > 0,
+      monthLabel,
     };
-  }, [orders]);
+  }, [orders, monthOrders, monthLabel]);
 
   function openCreate() {
     setEditing(null);
@@ -177,7 +195,8 @@ export function PsbClient({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-sm text-[var(--muted)]">
-            {filteredOrders.length} dari {orders.length} data PSB
+            {filteredOrders.length} dari {monthOrders.length} PSB bulan{" "}
+            {monthLabel} · total {orders.length} data
           </p>
         </div>
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
@@ -246,7 +265,7 @@ export function PsbClient({
             {formatRp(summary.estLangganan)}
           </p>
           <p className="mt-1 text-xs text-[var(--muted)]">
-            Total harga paket status aktif / bulan
+            Harga paket status aktif · {summary.monthLabel}
           </p>
         </div>
         <div className="panel kpi-card kpi-accent-cyan p-4">
@@ -257,7 +276,7 @@ export function PsbClient({
             {formatRp(summary.omzetPemasangan)}
           </p>
           <p className="mt-1 text-xs text-[var(--muted)]">
-            Total fee PSB yang sudah/akan terpasang
+            Total fee PSB · {summary.monthLabel}
           </p>
         </div>
         <div className="panel kpi-card kpi-accent-orange p-4">
@@ -268,7 +287,7 @@ export function PsbClient({
             {summary.terpasang}
           </p>
           <p className="mt-1 text-xs text-[var(--muted)]">
-            Jumlah PSB berstatus aktif
+            Status aktif · {summary.monthLabel}
           </p>
         </div>
       </div>
@@ -292,6 +311,18 @@ export function PsbClient({
       </div>
 
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
+        <div className="w-full lg:w-52">
+          <label className="label" htmlFor="psb-month">
+            Bulan pemasangan
+          </label>
+          <input
+            id="psb-month"
+            type="month"
+            className="input"
+            value={monthFilter}
+            onChange={(e) => setMonthFilter(e.target.value)}
+          />
+        </div>
         <div className="flex-1">
           <label className="label" htmlFor="psb-search">
             Cari

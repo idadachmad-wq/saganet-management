@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import 'package:saganet_mobile/data/local_db.dart';
 import 'package:saganet_mobile/data/models.dart';
+import 'package:saganet_mobile/finance_math.dart';
+import 'package:saganet_mobile/theme.dart';
+import 'package:saganet_mobile/widgets/empty_state.dart';
+import 'package:saganet_mobile/widgets/status_badge.dart';
 
 const _statuses = ['semua', 'aktif', 'isolir', 'putus'];
 
@@ -53,13 +57,20 @@ class _CustomersScreenState extends State<CustomersScreen> {
   Future<void> _openForm({CustomerRow? existing}) async {
     if (!widget.canMutate) return;
     final name = TextEditingController(text: existing?.name ?? '');
+    final nik = TextEditingController(text: existing?.nik ?? '');
     final phone = TextEditingController(text: existing?.phone ?? '');
     final address = TextEditingController(text: existing?.address ?? '');
+    final packageName = TextEditingController(text: existing?.packageName ?? '');
+    final monthly =
+        TextEditingController(text: existing != null ? '${existing.monthlyFee}' : '');
+    final ssid = TextEditingController(text: existing?.wifiSsid ?? '');
+    final pppoe = TextEditingController(text: existing?.pppoeUser ?? '');
     var status = existing?.status ?? 'aktif';
 
     final ok = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
+      backgroundColor: SagaColors.mintCanvas,
       builder: (ctx) {
         return Padding(
           padding: EdgeInsets.only(
@@ -70,42 +81,82 @@ class _CustomersScreenState extends State<CustomersScreen> {
           ),
           child: StatefulBuilder(
             builder: (context, setModal) {
-              return Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    existing == null ? 'Pelanggan baru' : 'Edit pelanggan',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: name,
-                    decoration: const InputDecoration(labelText: 'Nama'),
-                  ),
-                  TextField(
-                    controller: phone,
-                    decoration: const InputDecoration(labelText: 'Telepon'),
-                  ),
-                  TextField(
-                    controller: address,
-                    decoration: const InputDecoration(labelText: 'Alamat'),
-                  ),
-                  DropdownButtonFormField<String>(
-                    value: status,
-                    items: _statuses
-                        .where((s) => s != 'semua')
-                        .map((s) => DropdownMenuItem(value: s, child: Text(s)))
-                        .toList(),
-                    onChanged: (v) => setModal(() => status = v ?? status),
-                    decoration: const InputDecoration(labelText: 'Status'),
-                  ),
-                  const SizedBox(height: 12),
-                  FilledButton(
-                    onPressed: () => Navigator.pop(ctx, true),
-                    child: const Text('Simpan'),
-                  ),
-                ],
+              return SizedBox(
+                height: MediaQuery.of(ctx).size.height * 0.8,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      existing == null ? 'Pelanggan baru' : 'Edit pelanggan',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: SagaColors.ink,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Expanded(
+                      child: ListView(
+                        children: [
+                          TextField(
+                            controller: name,
+                            decoration: const InputDecoration(labelText: 'Nama *'),
+                          ),
+                          TextField(
+                            controller: nik,
+                            decoration: const InputDecoration(labelText: 'NIK'),
+                            keyboardType: TextInputType.number,
+                          ),
+                          TextField(
+                            controller: phone,
+                            decoration: const InputDecoration(labelText: 'Telepon'),
+                            keyboardType: TextInputType.phone,
+                          ),
+                          TextField(
+                            controller: address,
+                            decoration: const InputDecoration(labelText: 'Alamat'),
+                            maxLines: 2,
+                          ),
+                          TextField(
+                            controller: packageName,
+                            decoration: const InputDecoration(labelText: 'Paket'),
+                          ),
+                          TextField(
+                            controller: monthly,
+                            decoration: const InputDecoration(labelText: 'Biaya bulanan'),
+                            keyboardType: TextInputType.number,
+                          ),
+                          TextField(
+                            controller: ssid,
+                            decoration: const InputDecoration(labelText: 'SSID WiFi'),
+                          ),
+                          TextField(
+                            controller: pppoe,
+                            decoration: const InputDecoration(labelText: 'PPPoE user'),
+                          ),
+                          DropdownButtonFormField<String>(
+                            // ignore: deprecated_member_use
+                            value: status,
+                            items: _statuses
+                                .where((s) => s != 'semua')
+                                .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                                .toList(),
+                            onChanged: (v) => setModal(() => status = v ?? status),
+                            decoration: const InputDecoration(labelText: 'Status'),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    FilledButton(
+                      onPressed: () {
+                        if (name.text.trim().isEmpty) return;
+                        Navigator.pop(ctx, true);
+                      },
+                      child: const Text('Simpan'),
+                    ),
+                  ],
+                ),
               );
             },
           ),
@@ -113,30 +164,93 @@ class _CustomersScreenState extends State<CustomersScreen> {
       },
     );
 
-    if (ok != true) return;
+    final controllers = [name, nik, phone, address, packageName, monthly, ssid, pppoe];
+    if (ok != true) {
+      for (final c in controllers) {
+        c.dispose();
+      }
+      return;
+    }
+
     final now = DateTime.now().toUtc().toIso8601String();
-    final row = existing == null
-        ? CustomerRow(
-            id: const Uuid().v4(),
-            name: name.text.trim(),
-            phone: phone.text.trim().isEmpty ? null : phone.text.trim(),
-            address: address.text.trim().isEmpty ? null : address.text.trim(),
-            status: status,
-            createdAt: now,
-            updatedAt: now,
-            dirty: 1,
-          )
-        : existing.copyWith(
-            name: name.text.trim(),
-            phone: phone.text.trim().isEmpty ? null : phone.text.trim(),
-            address: address.text.trim().isEmpty ? null : address.text.trim(),
-            status: status,
-            updatedAt: now,
-            dirty: 1,
-          );
+    final row = CustomerRow(
+      id: existing?.id ?? const Uuid().v4(),
+      name: name.text.trim(),
+      nik: nullIfEmpty(nik.text),
+      phone: nullIfEmpty(phone.text),
+      address: nullIfEmpty(address.text),
+      packageName: nullIfEmpty(packageName.text),
+      monthlyFee: parseRpInput(monthly.text),
+      wifiSsid: nullIfEmpty(ssid.text),
+      pppoeUser: nullIfEmpty(pppoe.text),
+      status: status,
+      ispPartnerId: existing?.ispPartnerId,
+      installedAt: existing?.installedAt,
+      createdAt: existing?.createdAt ?? now,
+      updatedAt: now,
+      dirty: 1,
+    );
+    for (final c in controllers) {
+      c.dispose();
+    }
+
     await widget.db.upsertCustomer(row);
     widget.onChanged();
     await _load();
+  }
+
+  Future<void> _delete(CustomerRow row) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Hapus pelanggan?'),
+        content: Text('"${row.name}" akan dihapus (sync saat online).'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Batal')),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(backgroundColor: const Color(0xFFB91C1C)),
+            child: const Text('Hapus'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+    final now = DateTime.now().toUtc().toIso8601String();
+    await widget.db.upsertCustomer(
+      row.copyWith(deletedLocally: 1, dirty: 1, updatedAt: now),
+    );
+    widget.onChanged();
+    await _load();
+  }
+
+  void _showActions(CustomerRow r) {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.edit_outlined),
+              title: const Text('Edit'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _openForm(existing: r);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline, color: Color(0xFFB91C1C)),
+              title: const Text('Hapus'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _delete(r);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -150,16 +264,18 @@ class _CustomersScreenState extends State<CustomersScreen> {
               children: [
                 Expanded(
                   child: Text(
-                    'Pelanggan',
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
+                    '${_rows.length} pelanggan',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          color: SagaColors.ink,
                         ),
                   ),
                 ),
                 if (widget.canMutate)
-                  IconButton.filled(
+                  FilledButton.icon(
                     onPressed: () => _openForm(),
-                    icon: const Icon(Icons.add),
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text('Tambah'),
                   ),
               ],
             ),
@@ -172,10 +288,9 @@ class _CustomersScreenState extends State<CustomersScreen> {
                   child: TextField(
                     controller: _search,
                     decoration: const InputDecoration(
-                      hintText: 'Cari…',
+                      hintText: 'Cari nama / telepon…',
                       prefixIcon: Icon(Icons.search),
                       isDense: true,
-                      border: OutlineInputBorder(),
                     ),
                     onChanged: (_) => _load(),
                   ),
@@ -199,22 +314,48 @@ class _CustomersScreenState extends State<CustomersScreen> {
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
                 : _rows.isEmpty
-                    ? const Center(child: Text('Belum ada pelanggan lokal'))
-                    : ListView.separated(
+                    ? EmptyState(
+                        icon: Icons.groups_outlined,
+                        title: 'Belum ada pelanggan lokal',
+                        subtitle: widget.canMutate
+                            ? 'Sync dari server atau tambah data baru.'
+                            : 'Sync dari server untuk melihat data.',
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
                         itemCount: _rows.length,
-                        separatorBuilder: (_, __) => const Divider(height: 1),
                         itemBuilder: (context, i) {
                           final r = _rows[i];
-                          return ListTile(
-                            title: Text(r.name),
-                            subtitle: Text(
-                              '${r.status} · ${r.phone ?? '-'} · ${r.address ?? '-'}',
+                          return Card(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            child: ListTile(
+                              title: Text(
+                                r.name,
+                                style: const TextStyle(fontWeight: FontWeight.w700),
+                              ),
+                              subtitle: Text(
+                                [
+                                  if (r.packageName != null && r.packageName!.isNotEmpty)
+                                    r.packageName!,
+                                  if (r.phone != null) r.phone!,
+                                  if (r.address != null) r.address!,
+                                ].join(' · '),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (r.dirty == 1) ...[
+                                    const Icon(Icons.cloud_upload_outlined,
+                                        size: 16, color: SagaColors.muted),
+                                    const SizedBox(width: 6),
+                                  ],
+                                  StatusBadge(r.status, tone: toneForCustomer(r.status)),
+                                ],
+                              ),
+                              onTap: widget.canMutate ? () => _showActions(r) : null,
                             ),
-                            trailing: r.dirty == 1
-                                ? const Icon(Icons.cloud_upload_outlined, size: 18)
-                                : null,
-                            onTap:
-                                widget.canMutate ? () => _openForm(existing: r) : null,
                           );
                         },
                       ),

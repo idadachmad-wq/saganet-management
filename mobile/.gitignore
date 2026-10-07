@@ -13,6 +13,7 @@ build/
 .env
 .env.*
 !.env.example
+dart_defines.json
 
 # Android
 **/android/**/gradle-wrapper.jar

@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('placeholder', () {
-    expect(1 + 1, 2);
+  test('placeholder suite kept for flutter test discovery', () {
+    expect(true, isTrue);
   });
 }
