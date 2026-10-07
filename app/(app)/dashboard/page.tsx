@@ -12,6 +12,7 @@ import { MonthFilter } from "@/components/month-filter";
 import {
   calculateProfitShare,
   DEFAULT_RATES,
+  formatPercent,
   formatRp,
 } from "@/lib/bagi-hasil";
 import { APP_NAME, PSB_STATUS_LABELS } from "@/lib/constants";
@@ -43,6 +44,7 @@ export default async function DashboardPage({
   const selectedMonth = new Date(year, month - 1, 1);
   const chartStart = startOfMonth(subMonths(selectedMonth, 5));
   const monthLabel = format(selectedMonth, "MMMM yyyy", { locale: localeId });
+  const chartStartLabel = format(chartStart, "MMMM yyyy", { locale: localeId });
 
   const [customers, psbOrders, setting, recentPsb, financeAll] =
     await Promise.all([
@@ -91,6 +93,29 @@ export default async function DashboardPage({
     ispShare: rates.ispShare,
   });
 
+  const shareRows = [
+    { label: "Omzet Invoice (Gross)", value: share.gross },
+    {
+      label: `PPN ${formatPercent(share.rates.ppnRate)}`,
+      value: share.ppn,
+    },
+    { label: "Setelah PPN", value: share.setelahPpn },
+    {
+      label: `BHPUSO ${formatPercent(share.rates.bhpUsoRate)}`,
+      value: share.bhpuso,
+    },
+    { label: "Net bagi hasil", value: share.net },
+    {
+      label: `Bagian SaGa-Net ${formatPercent(share.rates.saganetShare)}`,
+      value: share.saganet,
+      highlight: true as const,
+    },
+    {
+      label: `Bagian ISP ${formatPercent(share.rates.ispShare)}`,
+      value: share.isp,
+    },
+  ];
+
   const chartData = Array.from({ length: 6 }, (_, idx) => {
     const d = subMonths(selectedMonth, 5 - idx);
     const key = format(d, "yyyy-MM");
@@ -118,16 +143,20 @@ export default async function DashboardPage({
         <h2 className="relative z-[1] mt-2 max-w-xl text-3xl font-bold tracking-tight md:text-4xl">
           {APP_NAME}
         </h2>
-        <p className="banner-sub relative z-[1] mt-3 max-w-2xl text-sm md:text-base">
+        <p className="banner-sub relative z-[1] mt-3 max-w-2xl text-sm leading-relaxed md:text-base">
           {perms.canViewFinance
-            ? "Pantau pelanggan aktif, pipeline PSB, arus kas, dan bagi hasil ISP dalam satu workspace."
-            : "Pantau pelanggan aktif dan pipeline PSB. Data keuangan tersimpan tidak ditampilkan untuk akun teknisi."}
+            ? `Semua KPI dan bagi hasil mengikuti filter bulan di bawah. Pantau pelanggan aktif yang terpasang, pipeline PSB, omzet invoice, tanggungan, arus kas 6 bulan, serta skema bagi hasil ISP untuk ${monthLabel}.`
+            : `Semua KPI mengikuti filter bulan di bawah. Pantau pelanggan aktif yang terpasang dan pipeline PSB untuk ${monthLabel}. Data keuangan tidak ditampilkan untuk akun teknisi.`}
         </p>
       </div>
 
       <PageHeader
         title="Dashboard"
-        description={`Ringkasan operasional ${monthLabel}`}
+        description={
+          perms.canViewFinance
+            ? `Ringkasan operasional ${monthLabel}: pelanggan aktif dihitung dari tanggal pemasangan, PSB berjalan dari status lead/survey/install, omzet & tanggungan dari transaksi bulan itu. Grafik arus kas menampilkan 6 bulan terakhir sampai ${monthLabel}.`
+            : `Ringkasan operasional ${monthLabel}: pelanggan aktif dihitung dari tanggal pemasangan, PSB berjalan dari status lead/survey/install pada bulan terpilih.`
+        }
         actions={
           <MonthFilter value={monthValue} ariaLabel="Bulan dashboard" />
         }
@@ -137,13 +166,13 @@ export default async function DashboardPage({
         <KpiCard
           label="Pelanggan Aktif"
           value={String(activeCustomers)}
-          hint={`Terpasang ${monthLabel}`}
+          hint={`Status aktif dengan tanggal pemasangan di ${monthLabel}`}
           accent="cyan"
         />
         <KpiCard
           label="PSB Berjalan"
           value={String(openPsb)}
-          hint={`Lead / survey / install · ${monthLabel}`}
+          hint={`Lead, survey, atau install yang tanggalnya di ${monthLabel}`}
           accent="orange"
         />
         {perms.canViewFinance ? (
@@ -151,13 +180,13 @@ export default async function DashboardPage({
             <KpiCard
               label="Omzet Invoice"
               value={formatRp(gross)}
-              hint={monthLabel}
+              hint={`Total transaksi invoice masuk di ${monthLabel}`}
               accent="brand"
             />
             <KpiCard
               label="Tanggungan"
               value={formatRp(monthTanggungan)}
-              hint={monthLabel}
+              hint={`Total kategori tanggungan di ${monthLabel}`}
               accent="pink"
             />
           </>
@@ -167,7 +196,7 @@ export default async function DashboardPage({
       {perms.canViewFinance ? (
         <div className="grid gap-5 lg:grid-cols-[1.35fr_0.85fr]">
           <div className="panel p-4 md:p-5">
-            <div className="mb-4 flex items-center justify-between gap-2">
+            <div className="mb-1 flex items-center justify-between gap-2">
               <h3 className="font-semibold text-[var(--text)]">
                 Arus Kas 6 Bulan
               </h3>
@@ -176,6 +205,10 @@ export default async function DashboardPage({
                 {format(selectedMonth, "MMM yy", { locale: localeId })}
               </span>
             </div>
+            <p className="mb-4 text-sm leading-relaxed text-[var(--muted)]">
+              Perbandingan kas masuk dan keluar dari {chartStartLabel} sampai{" "}
+              {monthLabel}. Digeser otomatis saat filter bulan diubah.
+            </p>
             <RevenueChart key={monthValue} data={chartData} />
           </div>
 
@@ -183,34 +216,31 @@ export default async function DashboardPage({
             <h3 className="font-semibold text-[var(--text)]">
               Bagi Hasil {monthLabel}
             </h3>
-            <p className="mt-1 text-sm text-[var(--muted)]">
-              Setelah PPN 11% & BHPUSO 1,75% · berdasarkan invoice {monthLabel}
+            <p className="mt-1 text-sm leading-relaxed text-[var(--muted)]">
+              Dihitung dari omzet invoice {monthLabel}: potong PPN{" "}
+              {formatPercent(share.rates.ppnRate)}, lalu BHPUSO{" "}
+              {formatPercent(share.rates.bhpUsoRate)}, kemudian dibagi SaGa-Net{" "}
+              {formatPercent(share.rates.saganetShare)} dan ISP{" "}
+              {formatPercent(share.rates.ispShare)}.
             </p>
             <div className="mt-5 space-y-3">
-              <div className="flex justify-between gap-3 text-sm">
-                <span className="text-[var(--muted)]">Gross Invoice</span>
-                <span className="font-semibold text-[var(--text)]">
-                  {formatRp(gross)}
-                </span>
-              </div>
-              <div className="flex justify-between gap-3 text-sm">
-                <span className="text-[var(--muted)]">Net</span>
-                <span className="font-semibold text-[var(--text)]">
-                  {formatRp(share.net)}
-                </span>
-              </div>
-              <div className="flex justify-between gap-3 text-sm">
-                <span className="text-[var(--muted)]">SaGa-Net 65%</span>
-                <span className="font-semibold text-[var(--brand)]">
-                  {formatRp(share.saganet)}
-                </span>
-              </div>
-              <div className="flex justify-between gap-3 text-sm">
-                <span className="text-[var(--muted)]">ISP 35%</span>
-                <span className="font-semibold text-[var(--text)]">
-                  {formatRp(share.isp)}
-                </span>
-              </div>
+              {shareRows.map((row) => (
+                <div
+                  key={row.label}
+                  className="flex justify-between gap-3 text-sm"
+                >
+                  <span className="text-[var(--muted)]">{row.label}</span>
+                  <span
+                    className={`font-semibold ${
+                      "highlight" in row && row.highlight
+                        ? "text-[var(--brand)]"
+                        : "text-[var(--text)]"
+                    }`}
+                  >
+                    {formatRp(row.value)}
+                  </span>
+                </div>
+              ))}
             </div>
           </div>
         </div>
@@ -218,6 +248,10 @@ export default async function DashboardPage({
 
       <div className="mt-5 panel p-4 md:p-5">
         <h3 className="font-semibold text-[var(--text)]">PSB Terbaru</h3>
+        <p className="mt-1 text-sm leading-relaxed text-[var(--muted)]">
+          5 order PSB terbaru lintas status. Daftar ini tidak mengikuti filter
+          bulan di atas.
+        </p>
         <div className="mt-4 space-y-3">
           {recentPsb.map((item) => (
             <div
