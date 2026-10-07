@@ -16,7 +16,7 @@ export default async function KeuanganPage() {
     <div>
       <PageHeader
         title="Keuangan"
-        description="Rekap kas: invoice, shodaqoh, belanja, DTT, voucher mitra, dan tanggungan perusahaan."
+        description="Tab Ringkasan menampilkan semua pemasukan dan pengeluaran per jenis. Pilih sub-menu jenis (invoice, shodaqoh, belanja, DTT, voucher mitra, tanggungan) untuk input detail."
       />
       <KeuanganClient
         entries={entries}
