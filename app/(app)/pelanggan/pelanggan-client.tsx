@@ -11,6 +11,8 @@ import {
   updateCustomerRecord,
   updateCustomerStatus,
 } from "./actions";
+import { format } from "date-fns";
+import { id as localeId } from "date-fns/locale";
 
 const STATUSES = ["aktif", "isolir", "putus"] as const;
 
@@ -25,6 +27,12 @@ function formatDate(value?: string | null) {
   return new Date(value).toLocaleDateString("id-ID");
 }
 
+function installedMonthOf(customer: Customer) {
+  if (!customer.installedAt) return null;
+  const date = new Date(customer.installedAt);
+  return Number.isNaN(date.getTime()) ? null : format(date, "yyyy-MM");
+}
+
 export function PelangganClient({
   customers,
   canMutate,
@@ -34,13 +42,26 @@ export function PelangganClient({
 }) {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [monthFilter, setMonthFilter] = useState(() =>
+    format(new Date(), "yyyy-MM"),
+  );
   const [editing, setEditing] = useState<Customer | null>(null);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState("");
 
+  const monthLabel = useMemo(() => {
+    const [y, m] = monthFilter.split("-").map(Number);
+    if (!y || !m) return monthFilter;
+    return format(new Date(y, m - 1, 1), "MMM yyyy", { locale: localeId });
+  }, [monthFilter]);
+
+  const monthCustomers = useMemo(() => {
+    return customers.filter((c) => installedMonthOf(c) === monthFilter);
+  }, [customers, monthFilter]);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return customers.filter((c) => {
+    return monthCustomers.filter((c) => {
       if (statusFilter !== "all" && c.status !== statusFilter) return false;
       if (!q) return true;
       const hay = [
@@ -57,17 +78,16 @@ export function PelangganClient({
         .toLowerCase();
       return hay.includes(q);
     });
-  }, [customers, query, statusFilter]);
+  }, [monthCustomers, query, statusFilter]);
 
   const counts = useMemo(() => {
     return {
-      all: customers.length,
-      aktif: customers.filter((c) => c.status === "aktif").length,
-      isolir: customers.filter((c) => c.status === "isolir").length,
-      putus: customers.filter((c) => c.status === "putus").length,
+      all: monthCustomers.length,
+      aktif: monthCustomers.filter((c) => c.status === "aktif").length,
+      isolir: monthCustomers.filter((c) => c.status === "isolir").length,
+      putus: monthCustomers.filter((c) => c.status === "putus").length,
     };
-  }, [customers]);
-
+  }, [monthCustomers]);
   return (
     <div className="space-y-4 md:space-y-5">
       <div className="grid gap-3 sm:grid-cols-3">
@@ -78,6 +98,7 @@ export function PelangganClient({
           <p className="mt-2 text-2xl font-bold text-[var(--text)]">
             {counts.aktif}
           </p>
+          <p className="mt-1 text-xs text-[var(--muted)]">{monthLabel}</p>
         </div>
         <div className="panel kpi-card kpi-accent-orange p-4">
           <p className="text-xs font-bold uppercase tracking-[0.12em] text-[var(--muted)]">
@@ -86,6 +107,7 @@ export function PelangganClient({
           <p className="mt-2 text-2xl font-bold text-[var(--text)]">
             {counts.isolir}
           </p>
+          <p className="mt-1 text-xs text-[var(--muted)]">{monthLabel}</p>
         </div>
         <div className="panel kpi-card p-4">
           <p className="text-xs font-bold uppercase tracking-[0.12em] text-[var(--muted)]">
@@ -94,10 +116,23 @@ export function PelangganClient({
           <p className="mt-2 text-2xl font-bold text-[var(--text)]">
             {counts.putus}
           </p>
+          <p className="mt-1 text-xs text-[var(--muted)]">{monthLabel}</p>
         </div>
       </div>
 
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
+        <div className="w-full lg:w-52">
+          <label className="label" htmlFor="customer-month">
+            Bulan pasang
+          </label>
+          <input
+            id="customer-month"
+            type="month"
+            className="input"
+            value={monthFilter}
+            onChange={(e) => setMonthFilter(e.target.value)}
+          />
+        </div>
         <div className="flex-1">
           <label className="label" htmlFor="customer-search">
             Cari
@@ -132,14 +167,15 @@ export function PelangganClient({
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-[var(--muted)]">
-          {filtered.length} dari {customers.length} pelanggan
+          {filtered.length} dari {monthCustomers.length} pelanggan bulan{" "}
+          {monthLabel} · total {customers.length} data
         </p>
         <button
           type="button"
           className="btn btn-ghost w-full sm:w-auto"
           onClick={() => {
             downloadCsv(
-              `pelanggan-${statusFilter}-${new Date().toISOString().slice(0, 10)}.csv`,
+              `pelanggan-${statusFilter}-${monthFilter}.csv`,
               [
                 "nama",
                 "nik",

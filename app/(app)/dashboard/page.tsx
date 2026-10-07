@@ -14,16 +14,28 @@ import {
   formatRp,
 } from "@/lib/bagi-hasil";
 import { APP_NAME, PSB_STATUS_LABELS } from "@/lib/constants";
-import { startOfMonth, subMonths, format } from "date-fns";
+import { endOfMonth, startOfMonth, subMonths, format } from "date-fns";
 import { id as localeId } from "date-fns/locale";
 
 export const metadata = { title: "Dashboard" };
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ month?: string }>;
+}) {
   const perms = await getSessionPermissions();
+  const params = await searchParams;
   const now = new Date();
-  const monthStart = startOfMonth(now);
-  const chartStart = startOfMonth(subMonths(now, 5));
+  const monthValue =
+    params.month ??
+    `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const [year, month] = monthValue.split("-").map(Number);
+  const selectedMonth = new Date(year, month - 1, 1);
+  const monthStart = startOfMonth(selectedMonth);
+  const monthEnd = endOfMonth(selectedMonth);
+  const chartStart = startOfMonth(subMonths(selectedMonth, 5));
+  const monthLabel = format(selectedMonth, "MMMM yyyy", { locale: localeId });
 
   const [activeCustomers, openPsb, setting, recentPsb, financeAll] =
     await Promise.all([
@@ -36,17 +48,17 @@ export default async function DashboardPage() {
         : Promise.resolve([]),
     ]);
 
-  const monthInvoices = financeAll.filter(
-    (e) =>
-      e.category === "invoice" &&
-      e.type === "masuk" &&
-      new Date(e.occurredAt) >= monthStart,
-  );
+  const monthInvoices = financeAll.filter((e) => {
+    if (e.category !== "invoice" || e.type !== "masuk") return false;
+    const d = new Date(e.occurredAt);
+    return d >= monthStart && d <= monthEnd;
+  });
   const monthTanggungan = financeAll
-    .filter(
-      (e) =>
-        e.category === "tanggungan" && new Date(e.occurredAt) >= monthStart,
-    )
+    .filter((e) => {
+      if (e.category !== "tanggungan") return false;
+      const d = new Date(e.occurredAt);
+      return d >= monthStart && d <= monthEnd;
+    })
     .reduce((s, e) => s + e.amount, 0);
 
   const gross = monthInvoices.reduce((s, i) => s + i.amount, 0);
@@ -59,7 +71,7 @@ export default async function DashboardPage() {
   });
 
   const chartData = Array.from({ length: 6 }, (_, idx) => {
-    const d = subMonths(now, 5 - idx);
+    const d = subMonths(selectedMonth, 5 - idx);
     const key = format(d, "yyyy-MM");
     const label = format(d, "MMM", { locale: localeId });
     const bulanEntries = financeAll.filter(
@@ -94,14 +106,28 @@ export default async function DashboardPage() {
 
       <PageHeader
         title="Dashboard"
-        description={`Ringkasan operasional ${format(now, "MMMM yyyy", { locale: localeId })}`}
+        description={`Ringkasan operasional ${monthLabel}`}
+        actions={
+          <form className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+            <input
+              type="month"
+              name="month"
+              defaultValue={monthValue}
+              className="input w-full sm:w-auto"
+              aria-label="Bulan dashboard"
+            />
+            <button type="submit" className="btn btn-ghost w-full sm:w-auto">
+              Terapkan
+            </button>
+          </form>
+        }
       />
 
       <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard
           label="Pelanggan Aktif"
           value={String(activeCustomers)}
-          hint="Customer terpasang"
+          hint="Semua customer aktif"
           accent="cyan"
         />
         <KpiCard
@@ -115,13 +141,13 @@ export default async function DashboardPage() {
             <KpiCard
               label="Omzet Invoice"
               value={formatRp(gross)}
-              hint="Bulan ini"
+              hint={monthLabel}
               accent="brand"
             />
             <KpiCard
               label="Tanggungan"
               value={formatRp(monthTanggungan)}
-              hint="Bulan ini"
+              hint={monthLabel}
               accent="pink"
             />
           </>
@@ -129,42 +155,46 @@ export default async function DashboardPage() {
       </div>
 
       {perms.canViewFinance ? (
-      <div className="grid gap-5 lg:grid-cols-[1.35fr_0.85fr]">
-        <div className="panel p-4 md:p-5">
-          <div className="mb-4 flex items-center justify-between gap-2">
-            <h3 className="font-semibold text-[var(--text)]">Arus Kas 6 Bulan</h3>
-            <span className="badge">Masuk vs Keluar</span>
+        <div className="grid gap-5 lg:grid-cols-[1.35fr_0.85fr]">
+          <div className="panel p-4 md:p-5">
+            <div className="mb-4 flex items-center justify-between gap-2">
+              <h3 className="font-semibold text-[var(--text)]">
+                Arus Kas 6 Bulan
+              </h3>
+              <span className="badge">Sampai {format(selectedMonth, "MMM yy", { locale: localeId })}</span>
+            </div>
+            <RevenueChart data={chartData} />
           </div>
-          <RevenueChart data={chartData} />
-        </div>
 
-        <div className="panel p-4 md:p-5">
-          <h3 className="font-semibold text-[var(--text)]">Bagi Hasil Bulan Ini</h3>
-          <p className="mt-1 text-sm text-[var(--muted)]">
-            Setelah PPN 11% & BHPUSO 1,75%
-          </p>
-          <div className="mt-5 space-y-3">
-            <div className="flex justify-between gap-3 text-sm">
-              <span className="text-[var(--muted)]">Net</span>
-              <span className="font-semibold text-[var(--text)]">
-                {formatRp(share.net)}
-              </span>
-            </div>
-            <div className="flex justify-between gap-3 text-sm">
-              <span className="text-[var(--muted)]">SaGa-Net 65%</span>
-              <span className="font-semibold text-[var(--brand)]">
-                {formatRp(share.saganet)}
-              </span>
-            </div>
-            <div className="flex justify-between gap-3 text-sm">
-              <span className="text-[var(--muted)]">ISP 35%</span>
-              <span className="font-semibold text-[var(--text)]">
-                {formatRp(share.isp)}
-              </span>
+          <div className="panel p-4 md:p-5">
+            <h3 className="font-semibold text-[var(--text)]">
+              Bagi Hasil {monthLabel}
+            </h3>
+            <p className="mt-1 text-sm text-[var(--muted)]">
+              Setelah PPN 11% & BHPUSO 1,75%
+            </p>
+            <div className="mt-5 space-y-3">
+              <div className="flex justify-between gap-3 text-sm">
+                <span className="text-[var(--muted)]">Net</span>
+                <span className="font-semibold text-[var(--text)]">
+                  {formatRp(share.net)}
+                </span>
+              </div>
+              <div className="flex justify-between gap-3 text-sm">
+                <span className="text-[var(--muted)]">SaGa-Net 65%</span>
+                <span className="font-semibold text-[var(--brand)]">
+                  {formatRp(share.saganet)}
+                </span>
+              </div>
+              <div className="flex justify-between gap-3 text-sm">
+                <span className="text-[var(--muted)]">ISP 35%</span>
+                <span className="font-semibold text-[var(--text)]">
+                  {formatRp(share.isp)}
+                </span>
+              </div>
             </div>
           </div>
         </div>
-      </div>
       ) : null}
 
       <div className="mt-5 panel p-4 md:p-5">

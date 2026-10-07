@@ -17,6 +17,8 @@ import {
 import type { FinanceEntry } from "@/lib/types";
 import { NumberInput } from "@/components/number-input";
 import { downloadCsv } from "@/lib/export-csv";
+import { format } from "date-fns";
+import { id as localeId } from "date-fns/locale";
 
 function toDateInput(value?: string | null) {
   if (!value) return new Date().toISOString().slice(0, 10);
@@ -38,22 +40,24 @@ export function KeuanganClient({
   const [pending, startTransition] = useTransition();
   const [formError, setFormError] = useState("");
   const [query, setQuery] = useState("");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const [monthFilter, setMonthFilter] = useState(() =>
+    format(new Date(), "yyyy-MM"),
+  );
+
+  const monthLabel = useMemo(() => {
+    const [y, m] = monthFilter.split("-").map(Number);
+    if (!y || !m) return monthFilter;
+    return format(new Date(y, m - 1, 1), "MMM yyyy", { locale: localeId });
+  }, [monthFilter]);
 
   const tabMeta = FINANCE_TABS.find((t) => t.key === tab)!;
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return entries.filter((e) => {
       if (e.category !== tab) return false;
-      if (dateFrom) {
-        const day = e.occurredAt.slice(0, 10);
-        if (day < dateFrom) return false;
-      }
-      if (dateTo) {
-        const day = e.occurredAt.slice(0, 10);
-        if (day > dateTo) return false;
-      }
+      const occurred = new Date(e.occurredAt);
+      if (Number.isNaN(occurred.getTime())) return false;
+      if (format(occurred, "yyyy-MM") !== monthFilter) return false;
       if (!q) return true;
       const hay = [e.description, e.reference, e.paymentMethod, e.type]
         .filter(Boolean)
@@ -61,8 +65,7 @@ export function KeuanganClient({
         .toLowerCase();
       return hay.includes(q);
     });
-  }, [entries, tab, query, dateFrom, dateTo]);
-
+  }, [entries, tab, query, monthFilter]);
   const totalMasuk = filtered
     .filter((e) => e.type === "masuk")
     .reduce((sum, e) => sum + e.amount, 0);
@@ -122,6 +125,9 @@ export function KeuanganClient({
           <p className="relative z-[1] mt-2 text-xl font-bold break-words text-[var(--text)]">
             {formatRp(totalMasuk)}
           </p>
+          <p className="relative z-[1] mt-1 text-xs text-[var(--muted)]">
+            {monthLabel}
+          </p>
         </div>
         <div className="panel kpi-card kpi-accent-pink p-4">
           <p className="relative z-[1] text-xs font-bold uppercase tracking-[0.12em] text-[var(--muted)]">
@@ -129,6 +135,9 @@ export function KeuanganClient({
           </p>
           <p className="relative z-[1] mt-2 text-xl font-bold break-words text-[var(--text)]">
             {formatRp(totalKeluar)}
+          </p>
+          <p className="relative z-[1] mt-1 text-xs text-[var(--muted)]">
+            {monthLabel}
           </p>
         </div>
         <div className="panel kpi-card kpi-accent-brand p-4">
@@ -138,12 +147,15 @@ export function KeuanganClient({
           <p className="relative z-[1] mt-2 text-xl font-bold break-words text-[var(--text)]">
             {formatRp(totalMasuk - totalKeluar)}
           </p>
+          <p className="relative z-[1] mt-1 text-xs text-[var(--muted)]">
+            {monthLabel}
+          </p>
         </div>
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-[var(--muted)]">
-          {filtered.length} transaksi · {tabMeta.label}
+          {filtered.length} transaksi · {tabMeta.label} · {monthLabel}
         </p>
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
           <button
@@ -162,7 +174,7 @@ export function KeuanganClient({
                 total: e.amount,
               }));
               downloadCsv(
-                `keuangan-${tab}-${new Date().toISOString().slice(0, 10)}.csv`,
+                `keuangan-${tab}-${monthFilter}.csv`,
                 [
                   "tanggal",
                   "kategori",
@@ -193,7 +205,19 @@ export function KeuanganClient({
         </div>
       </div>
 
-      <div className="grid gap-3 lg:grid-cols-[1.2fr_0.9fr_0.9fr]">
+      <div className="grid gap-3 lg:grid-cols-[0.9fr_1.4fr]">
+        <div>
+          <label className="label" htmlFor="finance-month">
+            Bulan transaksi
+          </label>
+          <input
+            id="finance-month"
+            className="input"
+            type="month"
+            value={monthFilter}
+            onChange={(e) => setMonthFilter(e.target.value)}
+          />
+        </div>
         <div>
           <label className="label" htmlFor="finance-search">
             Cari
@@ -204,30 +228,6 @@ export function KeuanganClient({
             placeholder="Deskripsi, referensi..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-          />
-        </div>
-        <div>
-          <label className="label" htmlFor="finance-from">
-            Dari tanggal
-          </label>
-          <input
-            id="finance-from"
-            className="input"
-            type="date"
-            value={dateFrom}
-            onChange={(e) => setDateFrom(e.target.value)}
-          />
-        </div>
-        <div>
-          <label className="label" htmlFor="finance-to">
-            Sampai tanggal
-          </label>
-          <input
-            id="finance-to"
-            className="input"
-            type="date"
-            value={dateTo}
-            onChange={(e) => setDateTo(e.target.value)}
           />
         </div>
       </div>
