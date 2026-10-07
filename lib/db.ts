@@ -5,6 +5,9 @@ import type {
   Customer,
   FinanceEntry,
   IspPartner,
+  Odc,
+  OdcPort,
+  OdcPortStatus,
   Odp,
   OdpPort,
   OdpPortStatus,
@@ -413,6 +416,7 @@ function mapOdpPort(row: Record<string, unknown>): OdpPort {
 function mapOdp(
   row: Record<string, unknown>,
   ports: OdpPort[] = [],
+  odcCode: string | null = null,
 ): Odp {
   return {
     id: String(row.id),
@@ -431,6 +435,8 @@ function mapOdp(
     tubeColor: (row.tube_color as string | null) ?? null,
     coreColor: (row.core_color as string | null) ?? null,
     portCount: Number(row.port_count ?? ports.length ?? 0),
+    odcId: (row.odc_id as string | null) ?? null,
+    odcCode,
     notes: (row.notes as string | null) ?? null,
     createdAt: String(row.created_at),
     updatedAt: String(row.updated_at),
@@ -492,12 +498,27 @@ export async function listOdps(): Promise<Odp[]> {
   if (!data?.length) return [];
 
   const ids = data.map((row) => String((row as Record<string, unknown>).id));
-  const { data: portRows, error: portError } = await getSupabase()
-    .from("odp_ports")
-    .select("*")
-    .in("odp_id", ids)
-    .order("port_number", { ascending: true });
+  const odcIds = [
+    ...new Set(
+      data
+        .map((row) => (row as Record<string, unknown>).odc_id)
+        .filter((v): v is string => typeof v === "string" && v.length > 0),
+    ),
+  ];
+
+  const [{ data: portRows, error: portError }, { data: odcRows, error: odcError }] =
+    await Promise.all([
+      getSupabase()
+        .from("odp_ports")
+        .select("*")
+        .in("odp_id", ids)
+        .order("port_number", { ascending: true }),
+      odcIds.length
+        ? getSupabase().from("odcs").select("id, code").in("id", odcIds)
+        : Promise.resolve({ data: [], error: null }),
+    ]);
   throwIfError(portError);
+  throwIfError(odcError);
 
   const portsByOdp = new Map<string, OdpPort[]>();
   for (const row of portRows ?? []) {
@@ -507,9 +528,20 @@ export async function listOdps(): Promise<Odp[]> {
     portsByOdp.set(port.odpId, list);
   }
 
+  const odcCodeById = new Map<string, string>();
+  for (const row of odcRows ?? []) {
+    const r = row as Record<string, unknown>;
+    odcCodeById.set(String(r.id), String(r.code));
+  }
+
   return data.map((row) => {
     const mapped = row as Record<string, unknown>;
-    return mapOdp(mapped, portsByOdp.get(String(mapped.id)) ?? []);
+    const odcId = (mapped.odc_id as string | null) ?? null;
+    return mapOdp(
+      mapped,
+      portsByOdp.get(String(mapped.id)) ?? [],
+      odcId ? (odcCodeById.get(odcId) ?? null) : null,
+    );
   });
 }
 
@@ -521,8 +553,20 @@ export async function getOdp(id: string): Promise<Odp | null> {
     .maybeSingle();
   throwIfError(error);
   if (!data) return null;
+  const mapped = data as Record<string, unknown>;
   const ports = await listPortsForOdp(id);
-  return mapOdp(data as Record<string, unknown>, ports);
+  let odcCode: string | null = null;
+  const odcId = (mapped.odc_id as string | null) ?? null;
+  if (odcId) {
+    const { data: odc, error: odcError } = await getSupabase()
+      .from("odcs")
+      .select("code")
+      .eq("id", odcId)
+      .maybeSingle();
+    throwIfError(odcError);
+    odcCode = odc ? String((odc as Record<string, unknown>).code) : null;
+  }
+  return mapOdp(mapped, ports, odcCode);
 }
 
 export async function createOdp(
@@ -585,6 +629,186 @@ export async function updateOdpPort(
     .single();
   throwIfWriteError(error);
   return mapOdpPort(data as Record<string, unknown>);
+}
+
+function mapOdcPort(row: Record<string, unknown>): OdcPort {
+  return {
+    id: String(row.id),
+    odcId: String(row.odc_id),
+    portNumber: Number(row.port_number),
+    status: row.status as OdcPortStatus,
+    label: (row.label as string | null) ?? null,
+    createdAt: String(row.created_at),
+    updatedAt: String(row.updated_at),
+  };
+}
+
+function mapOdc(row: Record<string, unknown>, ports: OdcPort[] = []): Odc {
+  return {
+    id: String(row.id),
+    code: String(row.code),
+    name: (row.name as string | null) ?? null,
+    location: String(row.location),
+    latitude:
+      row.latitude === null || row.latitude === undefined
+        ? null
+        : Number(row.latitude),
+    longitude:
+      row.longitude === null || row.longitude === undefined
+        ? null
+        : Number(row.longitude),
+    cableCode: (row.cable_code as string | null) ?? null,
+    tubeColor: (row.tube_color as string | null) ?? null,
+    coreColor: (row.core_color as string | null) ?? null,
+    portCount: Number(row.port_count ?? ports.length ?? 0),
+    feederOlt: (row.feeder_olt as string | null) ?? null,
+    splitterRatio: (row.splitter_ratio as string | null) ?? null,
+    capacityCores:
+      row.capacity_cores === null || row.capacity_cores === undefined
+        ? null
+        : Number(row.capacity_cores),
+    notes: (row.notes as string | null) ?? null,
+    createdAt: String(row.created_at),
+    updatedAt: String(row.updated_at),
+    ports: ports.sort((a, b) => a.portNumber - b.portNumber),
+  };
+}
+
+async function listPortsForOdc(odcId: string): Promise<OdcPort[]> {
+  const { data, error } = await getSupabase()
+    .from("odc_ports")
+    .select("*")
+    .eq("odc_id", odcId)
+    .order("port_number", { ascending: true });
+  throwIfError(error);
+  return (data ?? []).map((row) => mapOdcPort(row as Record<string, unknown>));
+}
+
+async function syncOdcPorts(odcId: string, portCount: number) {
+  const ports = await listPortsForOdc(odcId);
+  const byNumber = new Map(ports.map((p) => [p.portNumber, p]));
+  const toInsert: { odc_id: string; port_number: number; status: string }[] =
+    [];
+
+  for (let n = 1; n <= portCount; n += 1) {
+    if (!byNumber.has(n)) {
+      toInsert.push({ odc_id: odcId, port_number: n, status: "kosong" });
+    }
+  }
+
+  if (toInsert.length > 0) {
+    const { error } = await getSupabase().from("odc_ports").insert(toInsert);
+    throwIfWriteError(error);
+  }
+
+  const extras = ports
+    .filter((p) => p.portNumber > portCount)
+    .sort((a, b) => b.portNumber - a.portNumber);
+
+  for (const port of extras) {
+    if (port.status === "terpakai") {
+      throw new Error(
+        `Tidak bisa mengurangi port: port ${port.portNumber} masih terpakai`,
+      );
+    }
+    const { error } = await getSupabase()
+      .from("odc_ports")
+      .delete()
+      .eq("id", port.id);
+    throwIfWriteError(error);
+  }
+}
+
+export async function listOdcs(): Promise<Odc[]> {
+  const { data, error } = await getSupabase()
+    .from("odcs")
+    .select("*")
+    .order("code", { ascending: true });
+  throwIfError(error);
+  if (!data?.length) return [];
+
+  const ids = data.map((row) => String((row as Record<string, unknown>).id));
+  const { data: portRows, error: portError } = await getSupabase()
+    .from("odc_ports")
+    .select("*")
+    .in("odc_id", ids)
+    .order("port_number", { ascending: true });
+  throwIfError(portError);
+
+  const portsByOdc = new Map<string, OdcPort[]>();
+  for (const row of portRows ?? []) {
+    const port = mapOdcPort(row as Record<string, unknown>);
+    const list = portsByOdc.get(port.odcId) ?? [];
+    list.push(port);
+    portsByOdc.set(port.odcId, list);
+  }
+
+  return data.map((row) => {
+    const mapped = row as Record<string, unknown>;
+    return mapOdc(mapped, portsByOdc.get(String(mapped.id)) ?? []);
+  });
+}
+
+export async function createOdc(
+  payload: Record<string, unknown>,
+): Promise<Odc> {
+  const portCount = Math.max(1, Number(payload.port_count ?? 16));
+  const { data, error } = await getSupabase()
+    .from("odcs")
+    .insert({ ...payload, port_count: portCount })
+    .select("*")
+    .single();
+  throwIfWriteError(error);
+  const id = String((data as Record<string, unknown>).id);
+  await syncOdcPorts(id, portCount);
+  const ports = await listPortsForOdc(id);
+  return mapOdc(data as Record<string, unknown>, ports);
+}
+
+export async function updateOdc(
+  id: string,
+  payload: Record<string, unknown>,
+): Promise<Odc> {
+  const { data, error } = await getSupabase()
+    .from("odcs")
+    .update({ ...payload, updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .select("*")
+    .single();
+  throwIfWriteError(error);
+
+  if (payload.port_count !== undefined) {
+    const portCount = Math.max(1, Number(payload.port_count));
+    await syncOdcPorts(id, portCount);
+  }
+
+  const ports = await listPortsForOdc(id);
+  return mapOdc(data as Record<string, unknown>, ports);
+}
+
+export async function deleteOdc(id: string) {
+  const { error } = await getSupabase().from("odcs").delete().eq("id", id);
+  throwIfWriteError(error);
+}
+
+export async function updateOdcPort(
+  id: string,
+  payload: { status?: OdcPortStatus; label?: string | null },
+): Promise<OdcPort> {
+  const body: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+  };
+  if (payload.status !== undefined) body.status = payload.status;
+  if (payload.label !== undefined) body.label = payload.label;
+
+  const { data, error } = await getSupabase()
+    .from("odc_ports")
+    .update(body)
+    .eq("id", id)
+    .select("*")
+    .single();
+  throwIfWriteError(error);
+  return mapOdcPort(data as Record<string, unknown>);
 }
 
 export type { Customer };

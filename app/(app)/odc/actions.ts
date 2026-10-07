@@ -2,12 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import {
-  createOdp,
-  deleteOdp,
-  updateOdp,
-  updateOdpPort,
+  createOdc,
+  deleteOdc,
+  updateOdc,
+  updateOdcPort,
 } from "@/lib/db";
-import type { OdpPortStatus } from "@/lib/types";
+import type { OdcPortStatus } from "@/lib/types";
 import { requirePsbMutate } from "@/lib/app-user";
 
 function parseOptionalNumber(value: FormDataEntryValue | null) {
@@ -17,7 +17,7 @@ function parseOptionalNumber(value: FormDataEntryValue | null) {
   return Number.isFinite(n) ? n : null;
 }
 
-function parseOdpForm(formData: FormData) {
+function parseOdcForm(formData: FormData) {
   const code = String(formData.get("code") ?? "").trim();
   const name = String(formData.get("name") ?? "").trim() || null;
   const location = String(formData.get("location") ?? "").trim();
@@ -28,14 +28,16 @@ function parseOdpForm(formData: FormData) {
   const coreColor = String(formData.get("coreColor") ?? "").trim() || null;
   const portCount = Math.max(
     1,
-    Math.min(128, Number(formData.get("portCount") ?? 8) || 8),
+    Math.min(256, Number(formData.get("portCount") ?? 16) || 16),
   );
-  const odcIdRaw = String(formData.get("odcId") ?? "").trim();
-  const odcId = odcIdRaw || null;
+  const feederOlt = String(formData.get("feederOlt") ?? "").trim() || null;
+  const splitterRatio =
+    String(formData.get("splitterRatio") ?? "").trim() || null;
+  const capacityCores = parseOptionalNumber(formData.get("capacityCores"));
   const notes = String(formData.get("notes") ?? "").trim() || null;
 
   if (!code || !location) {
-    throw new Error("Kode ODP dan titik letak wajib diisi");
+    throw new Error("Kode ODC dan titik letak wajib diisi");
   }
 
   return {
@@ -48,32 +50,37 @@ function parseOdpForm(formData: FormData) {
     tube_color: tubeColor,
     core_color: coreColor,
     port_count: portCount,
-    odc_id: odcId,
+    feeder_olt: feederOlt,
+    splitter_ratio: splitterRatio,
+    capacity_cores: capacityCores,
     notes,
   };
 }
 
-export async function createOdpRecord(formData: FormData) {
+export async function createOdcRecord(formData: FormData) {
   await requirePsbMutate();
-  await createOdp(parseOdpForm(formData));
+  await createOdc(parseOdcForm(formData));
+  revalidatePath("/odc");
   revalidatePath("/odp");
 }
 
-export async function updateOdpRecord(formData: FormData) {
+export async function updateOdcRecord(formData: FormData) {
   await requirePsbMutate();
   const id = String(formData.get("id") ?? "").trim();
-  if (!id) throw new Error("ID ODP tidak ditemukan");
-  await updateOdp(id, parseOdpForm(formData));
+  if (!id) throw new Error("ID ODC tidak ditemukan");
+  await updateOdc(id, parseOdcForm(formData));
+  revalidatePath("/odc");
   revalidatePath("/odp");
 }
 
-export async function deleteOdpRecord(id: string) {
+export async function deleteOdcRecord(id: string) {
   await requirePsbMutate();
-  await deleteOdp(id);
+  await deleteOdc(id);
+  revalidatePath("/odc");
   revalidatePath("/odp");
 }
 
-export async function updateOdpPortRecord(formData: FormData) {
+export async function updateOdcPortRecord(formData: FormData) {
   await requirePsbMutate();
   const id = String(formData.get("id") ?? "").trim();
   if (!id) throw new Error("ID port tidak ditemukan");
@@ -81,7 +88,7 @@ export async function updateOdpPortRecord(formData: FormData) {
   const statusRaw = String(formData.get("status") ?? "").trim();
   const status =
     statusRaw === "kosong" || statusRaw === "terpakai"
-      ? (statusRaw as OdpPortStatus)
+      ? (statusRaw as OdcPortStatus)
       : undefined;
   const labelRaw = formData.get("label");
   const label =
@@ -89,6 +96,6 @@ export async function updateOdpPortRecord(formData: FormData) {
       ? undefined
       : String(labelRaw).trim() || null;
 
-  await updateOdpPort(id, { status, label });
-  revalidatePath("/odp");
+  await updateOdcPort(id, { status, label });
+  revalidatePath("/odc");
 }

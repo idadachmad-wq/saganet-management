@@ -48,6 +48,14 @@ function NavIcon({ name }: { name: string }) {
           <path d="M16 3.13a4 4 0 0 1 0 7.75" />
         </svg>
       );
+    case "odc":
+      return (
+        <svg {...common}>
+          <rect x="3" y="4" width="18" height="16" rx="2" />
+          <path d="M7 8h10M7 12h10M7 16h6" />
+          <path d="M17 14v4M15 16h4" />
+        </svg>
+      );
     case "odp":
       return (
         <svg {...common}>

@@ -60,10 +60,21 @@ export const ODP_PORT_STATUS_LABELS: Record<string, string> = {
   terpakai: "Terpakai",
 };
 
+export const ODC_PORT_STATUS_LABELS = ODP_PORT_STATUS_LABELS;
+
+export const SPLITTER_RATIOS = [
+  "1:4",
+  "1:8",
+  "1:16",
+  "1:32",
+  "1:64",
+] as const;
+
 export const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: "dashboard", finance: false, users: false },
   { href: "/psb", label: "PSB", icon: "psb", finance: false, users: false },
   { href: "/pelanggan", label: "Pelanggan", icon: "pelanggan", finance: false, users: false },
+  { href: "/odc", label: "ODC", icon: "odc", finance: false, users: false },
   { href: "/odp", label: "ODP", icon: "odp", finance: false, users: false },
   { href: "/keuangan", label: "Keuangan", icon: "keuangan", finance: true, users: false },
   { href: "/bagi-hasil", label: "Bagi Hasil ISP", icon: "bagihasil", finance: true, users: false },

@@ -90,6 +90,7 @@ export type Customer = {
 };
 
 export type OdpPortStatus = "kosong" | "terpakai";
+export type OdcPortStatus = OdpPortStatus;
 
 export type OdpPort = {
   id: string;
@@ -99,6 +100,36 @@ export type OdpPort = {
   label: string | null;
   createdAt: string;
   updatedAt: string;
+};
+
+export type OdcPort = {
+  id: string;
+  odcId: string;
+  portNumber: number;
+  status: OdcPortStatus;
+  label: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type Odc = {
+  id: string;
+  code: string;
+  name: string | null;
+  location: string;
+  latitude: number | null;
+  longitude: number | null;
+  cableCode: string | null;
+  tubeColor: string | null;
+  coreColor: string | null;
+  portCount: number;
+  feederOlt: string | null;
+  splitterRatio: string | null;
+  capacityCores: number | null;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+  ports: OdcPort[];
 };
 
 export type Odp = {
@@ -112,6 +143,8 @@ export type Odp = {
   tubeColor: string | null;
   coreColor: string | null;
   portCount: number;
+  odcId: string | null;
+  odcCode: string | null;
   notes: string | null;
   createdAt: string;
   updatedAt: string;
