@@ -12,6 +12,9 @@ import {
   formatRp,
 } from "@/lib/bagi-hasil";
 import { BagiHasilExport } from "./bagi-hasil-export";
+import { MonthFilter } from "@/components/month-filter";
+import { format } from "date-fns";
+import { id as localeId } from "date-fns/locale";
 
 export const metadata = { title: "Bagi Hasil ISP" };
 
@@ -26,18 +29,26 @@ export default async function BagiHasilPage({
   const params = await searchParams;
   const now = new Date();
   const monthValue =
-    params.month ??
-    `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    params.month && /^\d{4}-\d{2}$/.test(params.month)
+      ? params.month
+      : `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   const [year, month] = monthValue.split("-").map(Number);
   const start = new Date(year, month - 1, 1);
   const end = new Date(year, month, 1);
+  const monthLabel = format(start, "MMMM yyyy", { locale: localeId });
 
   const setting = (await getProfitShareSetting()) ?? DEFAULT_RATES;
 
-  const invoices = await listInvoicesInRange(
+  // Ambil rentang longgar, lalu filter ketat by yyyy-MM (hindari bug timezone)
+  const invoicesRaw = await listInvoicesInRange(
     start.toISOString(),
     end.toISOString(),
   );
+  const invoices = invoicesRaw.filter((inv) => {
+    const d = new Date(inv.occurredAt);
+    if (Number.isNaN(d.getTime())) return false;
+    return format(d, "yyyy-MM") === monthValue;
+  });
 
   const gross = invoices.reduce((sum, item) => sum + item.amount, 0);
   const breakdown = calculateProfitShare(gross, {
@@ -73,20 +84,10 @@ export default async function BagiHasilPage({
     <div>
       <PageHeader
         title="Bagi Hasil ISP"
-        description="Skema: potong PPN 11%, lalu BHPUSO 1,75%, kemudian bagi hasil SaGa-Net 65% dan ISP 35%."
+        description={`Skema: potong PPN 11%, lalu BHPUSO 1,75%, kemudian bagi hasil SaGa-Net 65% dan ISP 35%. Periode: ${monthLabel}.`}
         actions={
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
-            <form className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
-              <input
-                className="input"
-                type="month"
-                name="month"
-                defaultValue={monthValue}
-              />
-              <button className="btn btn-ghost w-full sm:w-auto" type="submit">
-                Terapkan
-              </button>
-            </form>
+            <MonthFilter value={monthValue} ariaLabel="Bulan bagi hasil" />
             <BagiHasilExport
               monthValue={monthValue}
               rows={rows}
@@ -102,10 +103,30 @@ export default async function BagiHasilPage({
       />
 
       <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <KpiCard label="Gross Invoice" value={formatRp(breakdown.gross)} accent="brand" />
-        <KpiCard label="Net Setelah Pajak" value={formatRp(breakdown.net)} accent="violet" />
-        <KpiCard label="SaGa-Net 65%" value={formatRp(breakdown.saganet)} accent="cyan" />
-        <KpiCard label="ISP 35%" value={formatRp(breakdown.isp)} accent="orange" />
+        <KpiCard
+          label="Gross Invoice"
+          value={formatRp(breakdown.gross)}
+          hint={monthLabel}
+          accent="brand"
+        />
+        <KpiCard
+          label="Net Setelah Pajak"
+          value={formatRp(breakdown.net)}
+          hint={monthLabel}
+          accent="violet"
+        />
+        <KpiCard
+          label="SaGa-Net 65%"
+          value={formatRp(breakdown.saganet)}
+          hint={monthLabel}
+          accent="cyan"
+        />
+        <KpiCard
+          label="ISP 35%"
+          value={formatRp(breakdown.isp)}
+          hint={monthLabel}
+          accent="orange"
+        />
       </div>
 
       <div className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">

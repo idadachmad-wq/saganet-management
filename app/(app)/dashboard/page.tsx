@@ -8,16 +8,23 @@ import {
 import { getSessionPermissions } from "@/lib/app-user";
 import { PageHeader, KpiCard } from "@/components/ui";
 import { RevenueChart } from "@/components/dashboard/revenue-chart-lazy";
+import { MonthFilter } from "@/components/month-filter";
 import {
   calculateProfitShare,
   DEFAULT_RATES,
   formatRp,
 } from "@/lib/bagi-hasil";
 import { APP_NAME, PSB_STATUS_LABELS } from "@/lib/constants";
-import { endOfMonth, startOfMonth, subMonths, format } from "date-fns";
+import { startOfMonth, subMonths, format } from "date-fns";
 import { id as localeId } from "date-fns/locale";
 
 export const metadata = { title: "Dashboard" };
+
+function occurredMonth(iso: string) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return format(d, "yyyy-MM");
+}
 
 export default async function DashboardPage({
   searchParams,
@@ -28,12 +35,11 @@ export default async function DashboardPage({
   const params = await searchParams;
   const now = new Date();
   const monthValue =
-    params.month ??
-    `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    params.month && /^\d{4}-\d{2}$/.test(params.month)
+      ? params.month
+      : `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   const [year, month] = monthValue.split("-").map(Number);
   const selectedMonth = new Date(year, month - 1, 1);
-  const monthStart = startOfMonth(selectedMonth);
-  const monthEnd = endOfMonth(selectedMonth);
   const chartStart = startOfMonth(subMonths(selectedMonth, 5));
   const monthLabel = format(selectedMonth, "MMMM yyyy", { locale: localeId });
 
@@ -48,17 +54,18 @@ export default async function DashboardPage({
         : Promise.resolve([]),
     ]);
 
-  const monthInvoices = financeAll.filter((e) => {
-    if (e.category !== "invoice" || e.type !== "masuk") return false;
-    const d = new Date(e.occurredAt);
-    return d >= monthStart && d <= monthEnd;
-  });
+  const monthInvoices = financeAll.filter(
+    (e) =>
+      e.category === "invoice" &&
+      e.type === "masuk" &&
+      occurredMonth(e.occurredAt) === monthValue,
+  );
   const monthTanggungan = financeAll
-    .filter((e) => {
-      if (e.category !== "tanggungan") return false;
-      const d = new Date(e.occurredAt);
-      return d >= monthStart && d <= monthEnd;
-    })
+    .filter(
+      (e) =>
+        e.category === "tanggungan" &&
+        occurredMonth(e.occurredAt) === monthValue,
+    )
     .reduce((s, e) => s + e.amount, 0);
 
   const gross = monthInvoices.reduce((s, i) => s + i.amount, 0);
@@ -75,7 +82,7 @@ export default async function DashboardPage({
     const key = format(d, "yyyy-MM");
     const label = format(d, "MMM", { locale: localeId });
     const bulanEntries = financeAll.filter(
-      (e) => format(new Date(e.occurredAt), "yyyy-MM") === key,
+      (e) => occurredMonth(e.occurredAt) === key,
     );
     return {
       label,
@@ -108,18 +115,7 @@ export default async function DashboardPage({
         title="Dashboard"
         description={`Ringkasan operasional ${monthLabel}`}
         actions={
-          <form className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
-            <input
-              type="month"
-              name="month"
-              defaultValue={monthValue}
-              className="input w-full sm:w-auto"
-              aria-label="Bulan dashboard"
-            />
-            <button type="submit" className="btn btn-ghost w-full sm:w-auto">
-              Terapkan
-            </button>
-          </form>
+          <MonthFilter value={monthValue} ariaLabel="Bulan dashboard" />
         }
       />
 
@@ -161,9 +157,12 @@ export default async function DashboardPage({
               <h3 className="font-semibold text-[var(--text)]">
                 Arus Kas 6 Bulan
               </h3>
-              <span className="badge">Sampai {format(selectedMonth, "MMM yy", { locale: localeId })}</span>
+              <span className="badge">
+                Sampai{" "}
+                {format(selectedMonth, "MMM yy", { locale: localeId })}
+              </span>
             </div>
-            <RevenueChart data={chartData} />
+            <RevenueChart key={monthValue} data={chartData} />
           </div>
 
           <div className="panel p-4 md:p-5">
@@ -171,9 +170,15 @@ export default async function DashboardPage({
               Bagi Hasil {monthLabel}
             </h3>
             <p className="mt-1 text-sm text-[var(--muted)]">
-              Setelah PPN 11% & BHPUSO 1,75%
+              Setelah PPN 11% & BHPUSO 1,75% · berdasarkan invoice {monthLabel}
             </p>
             <div className="mt-5 space-y-3">
+              <div className="flex justify-between gap-3 text-sm">
+                <span className="text-[var(--muted)]">Gross Invoice</span>
+                <span className="font-semibold text-[var(--text)]">
+                  {formatRp(gross)}
+                </span>
+              </div>
               <div className="flex justify-between gap-3 text-sm">
                 <span className="text-[var(--muted)]">Net</span>
                 <span className="font-semibold text-[var(--text)]">
