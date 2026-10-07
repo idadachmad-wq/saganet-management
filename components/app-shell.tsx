@@ -201,7 +201,6 @@ export function AppShell({
           </nav>
 
           <div className="mt-auto space-y-3">
-            <ThemeToggle />
             <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-soft)] p-3">
               <p className="text-xs text-[var(--muted)]">Masuk sebagai</p>
               <p className="mt-1 truncate text-sm font-semibold text-[var(--text)]">
@@ -262,10 +261,8 @@ export function AppShell({
                   Operasional jaringan & rekap keuangan
                 </p>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="hidden lg:block">
-                  <ThemeToggle />
-                </div>
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <ThemeToggle />
                 <div className="badge shrink-0">{ROLE_LABELS[role]}</div>
               </div>
             </div>
@@ -336,7 +333,6 @@ export function AppShell({
                 </nav>
 
                 <div className="space-y-3 border-t border-[var(--border)] p-4">
-                  <ThemeToggle />
                   <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-soft)] p-3">
                     <p className="text-xs text-[var(--muted)]">Masuk sebagai</p>
                     <p className="mt-1 truncate text-sm font-semibold text-[var(--text)]">

@@ -17,6 +17,8 @@ export type WorkspaceUser = {
   email: string;
   name: string;
   role: Role;
+  lastSignInAt: string | null;
+  createdAt: string | null;
 };
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
@@ -65,6 +67,8 @@ export async function listWorkspaceUsers(): Promise<WorkspaceUser[]> {
         name:
           profile?.name || metaName || user.email?.split("@")[0] || "Pengguna",
         role: profile?.role ?? "teknisi",
+        lastSignInAt: user.last_sign_in_at ?? null,
+        createdAt: user.created_at ?? null,
       };
     });
   }
@@ -75,6 +79,8 @@ export async function listWorkspaceUsers(): Promise<WorkspaceUser[]> {
     email: profile.id === session.id ? (session.email ?? "") : "",
     name: profile.name,
     role: profile.role,
+    lastSignInAt: null as string | null,
+    createdAt: null as string | null,
   }));
 
   if (session.id && !mapped.some((u) => u.id === session.id)) {
@@ -83,6 +89,8 @@ export async function listWorkspaceUsers(): Promise<WorkspaceUser[]> {
       email: session.email ?? "",
       name: session.name ?? "Pengguna",
       role: parseRole(session.role),
+      lastSignInAt: null,
+      createdAt: null,
     });
   }
 
@@ -132,6 +140,43 @@ export async function updateUserRole(formData: FormData): Promise<ActionResult> 
     return {
       ok: false,
       error: toErrorMessage(error, "Gagal mengubah peran"),
+    };
+  }
+}
+
+export async function updateUserPassword(
+  formData: FormData,
+): Promise<ActionResult> {
+  try {
+    if (!hasServiceRoleKey()) {
+      return {
+        ok: false,
+        error:
+          "SUPABASE_SERVICE_ROLE_KEY belum valid. Isi secret key lalu restart npm run dev.",
+      };
+    }
+
+    await requireManager();
+    const id = String(formData.get("id") ?? "").trim();
+    const password = String(formData.get("password") ?? "");
+    if (!id) return { ok: false, error: "ID pengguna tidak ditemukan" };
+    if (password.length < 6) {
+      return { ok: false, error: "Password baru minimal 6 karakter" };
+    }
+
+    const { error } = await getSupabaseAdmin().auth.admin.updateUserById(id, {
+      password,
+    });
+    if (error) {
+      return { ok: false, error: error.message };
+    }
+
+    revalidatePath("/pengguna");
+    return { ok: true };
+  } catch (error) {
+    return {
+      ok: false,
+      error: toErrorMessage(error, "Gagal mengubah password"),
     };
   }
 }
