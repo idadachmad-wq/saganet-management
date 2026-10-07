@@ -1,6 +1,7 @@
 import {
   getProfitShareSetting,
   listCustomers,
+  listFinanceEntries,
   listFinanceSince,
   listPsbOrders,
   listRecentPsb,
@@ -46,7 +47,7 @@ export default async function DashboardPage({
   const monthLabel = format(selectedMonth, "MMMM yyyy", { locale: localeId });
   const chartStartLabel = format(chartStart, "MMMM yyyy", { locale: localeId });
 
-  const [customers, psbOrders, setting, recentPsb, financeAll] =
+  const [customers, psbOrders, setting, recentPsb, financeAll, financeEntries] =
     await Promise.all([
       listCustomers(),
       listPsbOrders(),
@@ -55,7 +56,11 @@ export default async function DashboardPage({
       perms.canViewFinance
         ? listFinanceSince(chartStart.toISOString())
         : Promise.resolve([]),
+      perms.canViewFinance ? listFinanceEntries() : Promise.resolve([]),
     ]);
+
+  const psbAktifTotal = psbOrders.filter((o) => o.status === "aktif").length;
+  const custAktifTotal = customers.filter((c) => c.status === "aktif").length;
 
   const activeCustomers = customers.filter(
     (c) =>
@@ -162,6 +167,42 @@ export default async function DashboardPage({
         }
       />
 
+      <p className="mb-2 text-sm font-semibold text-[var(--text)]">
+        Ringkasan keseluruhan (semua data)
+      </p>
+      <div className="mb-5 grid gap-3 sm:grid-cols-3">
+        <KpiCard
+          label="PSB"
+          value={String(psbOrders.length)}
+          hint={`${psbAktifTotal} aktif`}
+          accent="orange"
+        />
+        <KpiCard
+          label="Pelanggan"
+          value={String(customers.length)}
+          hint={`${custAktifTotal} aktif`}
+          accent="cyan"
+        />
+        {perms.canViewFinance ? (
+          <KpiCard
+            label="Keuangan"
+            value={String(financeEntries.length)}
+            hint="Semua entri"
+            accent="violet"
+          />
+        ) : (
+          <KpiCard
+            label="Mode"
+            value="Field"
+            hint="PSB & pelanggan"
+            accent="green"
+          />
+        )}
+      </div>
+
+      <p className="mb-2 text-sm font-semibold text-[var(--text)]">
+        Ringkasan {monthLabel}
+      </p>
       <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard
           label="Pelanggan Aktif"
