@@ -104,6 +104,35 @@ create table if not exists profiles (
   updated_at timestamptz not null default now()
 );
 
+-- Manajemen ODP: kabel, warna tube/core, titik letak, port
+create table if not exists odps (
+  id text primary key default gen_random_uuid()::text,
+  code text not null unique,
+  name text,
+  location text not null,
+  latitude double precision,
+  longitude double precision,
+  cable_code text,
+  tube_color text,
+  core_color text,
+  port_count integer not null default 8 check (port_count >= 1),
+  notes text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists odp_ports (
+  id text primary key default gen_random_uuid()::text,
+  odp_id text not null references odps(id) on delete cascade,
+  port_number integer not null check (port_number >= 1),
+  status text not null default 'kosong'
+    check (status in ('kosong', 'terpakai')),
+  label text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (odp_id, port_number)
+);
+
 -- Auth app sendiri (Auth.js), bukan Supabase Auth → buka akses tabel untuk anon key
 alter table users enable row level security;
 alter table isp_partners enable row level security;
@@ -112,6 +141,8 @@ alter table psb_orders enable row level security;
 alter table finance_entries enable row level security;
 alter table profit_share_settings enable row level security;
 alter table profiles enable row level security;
+alter table odps enable row level security;
+alter table odp_ports enable row level security;
 
 drop policy if exists "allow_all_users" on users;
 drop policy if exists "allow_all_isp" on isp_partners;
@@ -120,6 +151,8 @@ drop policy if exists "allow_all_psb" on psb_orders;
 drop policy if exists "allow_all_finance" on finance_entries;
 drop policy if exists "allow_all_settings" on profit_share_settings;
 drop policy if exists "allow_all_profiles" on profiles;
+drop policy if exists "allow_all_odps" on odps;
+drop policy if exists "allow_all_odp_ports" on odp_ports;
 
 create policy "allow_all_users" on users for all using (true) with check (true);
 create policy "allow_all_isp" on isp_partners for all using (true) with check (true);
@@ -128,3 +161,5 @@ create policy "allow_all_psb" on psb_orders for all using (true) with check (tru
 create policy "allow_all_finance" on finance_entries for all using (true) with check (true);
 create policy "allow_all_settings" on profit_share_settings for all using (true) with check (true);
 create policy "allow_all_profiles" on profiles for all using (true) with check (true);
+create policy "allow_all_odps" on odps for all using (true) with check (true);
+create policy "allow_all_odp_ports" on odp_ports for all using (true) with check (true);

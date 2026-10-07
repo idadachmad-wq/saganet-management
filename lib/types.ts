@@ -88,3 +88,32 @@ export type Customer = {
   ispPartnerId: string | null;
   installedAt: string | null;
 };
+
+export type OdpPortStatus = "kosong" | "terpakai";
+
+export type OdpPort = {
+  id: string;
+  odpId: string;
+  portNumber: number;
+  status: OdpPortStatus;
+  label: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type Odp = {
+  id: string;
+  code: string;
+  name: string | null;
+  location: string;
+  latitude: number | null;
+  longitude: number | null;
+  cableCode: string | null;
+  tubeColor: string | null;
+  coreColor: string | null;
+  portCount: number;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+  ports: OdpPort[];
+};

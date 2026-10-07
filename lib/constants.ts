@@ -39,10 +39,32 @@ export const CUSTOMER_STATUS_LABELS: Record<string, string> = {
   putus: "Putus",
 };
 
+/** Warna standar fiber (TIA-598) untuk tube / core */
+export const FIBER_COLORS = [
+  "Biru",
+  "Oranye",
+  "Hijau",
+  "Coklat",
+  "Abu-abu",
+  "Putih",
+  "Merah",
+  "Hitam",
+  "Kuning",
+  "Ungu",
+  "Merah Muda",
+  "Aqua",
+] as const;
+
+export const ODP_PORT_STATUS_LABELS: Record<string, string> = {
+  kosong: "Kosong",
+  terpakai: "Terpakai",
+};
+
 export const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: "dashboard", finance: false, users: false },
   { href: "/psb", label: "PSB", icon: "psb", finance: false, users: false },
   { href: "/pelanggan", label: "Pelanggan", icon: "pelanggan", finance: false, users: false },
+  { href: "/odp", label: "ODP", icon: "odp", finance: false, users: false },
   { href: "/keuangan", label: "Keuangan", icon: "keuangan", finance: true, users: false },
   { href: "/bagi-hasil", label: "Bagi Hasil ISP", icon: "bagihasil", finance: true, users: false },
   { href: "/pengguna", label: "Pengguna", icon: "pengguna", finance: false, users: true },

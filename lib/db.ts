@@ -5,6 +5,9 @@ import type {
   Customer,
   FinanceEntry,
   IspPartner,
+  Odp,
+  OdpPort,
+  OdpPortStatus,
   Profile,
   ProfitShareSetting,
   PsbOrder,
@@ -393,6 +396,195 @@ export async function ensureProfileForAuthUser(user: {
   const superCount = await countSuperAdmins();
   const role: Role = superCount === 0 ? "super_admin" : "teknisi";
   return upsertProfile({ id: user.id, name, role });
+}
+
+function mapOdpPort(row: Record<string, unknown>): OdpPort {
+  return {
+    id: String(row.id),
+    odpId: String(row.odp_id),
+    portNumber: Number(row.port_number),
+    status: row.status as OdpPortStatus,
+    label: (row.label as string | null) ?? null,
+    createdAt: String(row.created_at),
+    updatedAt: String(row.updated_at),
+  };
+}
+
+function mapOdp(
+  row: Record<string, unknown>,
+  ports: OdpPort[] = [],
+): Odp {
+  return {
+    id: String(row.id),
+    code: String(row.code),
+    name: (row.name as string | null) ?? null,
+    location: String(row.location),
+    latitude:
+      row.latitude === null || row.latitude === undefined
+        ? null
+        : Number(row.latitude),
+    longitude:
+      row.longitude === null || row.longitude === undefined
+        ? null
+        : Number(row.longitude),
+    cableCode: (row.cable_code as string | null) ?? null,
+    tubeColor: (row.tube_color as string | null) ?? null,
+    coreColor: (row.core_color as string | null) ?? null,
+    portCount: Number(row.port_count ?? ports.length ?? 0),
+    notes: (row.notes as string | null) ?? null,
+    createdAt: String(row.created_at),
+    updatedAt: String(row.updated_at),
+    ports: ports.sort((a, b) => a.portNumber - b.portNumber),
+  };
+}
+
+async function listPortsForOdp(odpId: string): Promise<OdpPort[]> {
+  const { data, error } = await getSupabase()
+    .from("odp_ports")
+    .select("*")
+    .eq("odp_id", odpId)
+    .order("port_number", { ascending: true });
+  throwIfError(error);
+  return (data ?? []).map((row) => mapOdpPort(row as Record<string, unknown>));
+}
+
+async function syncOdpPorts(odpId: string, portCount: number) {
+  const ports = await listPortsForOdp(odpId);
+  const byNumber = new Map(ports.map((p) => [p.portNumber, p]));
+  const toInsert: { odp_id: string; port_number: number; status: string }[] =
+    [];
+
+  for (let n = 1; n <= portCount; n += 1) {
+    if (!byNumber.has(n)) {
+      toInsert.push({ odp_id: odpId, port_number: n, status: "kosong" });
+    }
+  }
+
+  if (toInsert.length > 0) {
+    const { error } = await getSupabase().from("odp_ports").insert(toInsert);
+    throwIfWriteError(error);
+  }
+
+  const extras = ports
+    .filter((p) => p.portNumber > portCount)
+    .sort((a, b) => b.portNumber - a.portNumber);
+
+  for (const port of extras) {
+    if (port.status === "terpakai") {
+      throw new Error(
+        `Tidak bisa mengurangi port: port ${port.portNumber} masih terpakai`,
+      );
+    }
+    const { error } = await getSupabase()
+      .from("odp_ports")
+      .delete()
+      .eq("id", port.id);
+    throwIfWriteError(error);
+  }
+}
+
+export async function listOdps(): Promise<Odp[]> {
+  const { data, error } = await getSupabase()
+    .from("odps")
+    .select("*")
+    .order("code", { ascending: true });
+  throwIfError(error);
+  if (!data?.length) return [];
+
+  const ids = data.map((row) => String((row as Record<string, unknown>).id));
+  const { data: portRows, error: portError } = await getSupabase()
+    .from("odp_ports")
+    .select("*")
+    .in("odp_id", ids)
+    .order("port_number", { ascending: true });
+  throwIfError(portError);
+
+  const portsByOdp = new Map<string, OdpPort[]>();
+  for (const row of portRows ?? []) {
+    const port = mapOdpPort(row as Record<string, unknown>);
+    const list = portsByOdp.get(port.odpId) ?? [];
+    list.push(port);
+    portsByOdp.set(port.odpId, list);
+  }
+
+  return data.map((row) => {
+    const mapped = row as Record<string, unknown>;
+    return mapOdp(mapped, portsByOdp.get(String(mapped.id)) ?? []);
+  });
+}
+
+export async function getOdp(id: string): Promise<Odp | null> {
+  const { data, error } = await getSupabase()
+    .from("odps")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  throwIfError(error);
+  if (!data) return null;
+  const ports = await listPortsForOdp(id);
+  return mapOdp(data as Record<string, unknown>, ports);
+}
+
+export async function createOdp(
+  payload: Record<string, unknown>,
+): Promise<Odp> {
+  const portCount = Math.max(1, Number(payload.port_count ?? 8));
+  const { data, error } = await getSupabase()
+    .from("odps")
+    .insert({ ...payload, port_count: portCount })
+    .select("*")
+    .single();
+  throwIfWriteError(error);
+  const id = String((data as Record<string, unknown>).id);
+  await syncOdpPorts(id, portCount);
+  const ports = await listPortsForOdp(id);
+  return mapOdp(data as Record<string, unknown>, ports);
+}
+
+export async function updateOdp(
+  id: string,
+  payload: Record<string, unknown>,
+): Promise<Odp> {
+  const { data, error } = await getSupabase()
+    .from("odps")
+    .update({ ...payload, updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .select("*")
+    .single();
+  throwIfWriteError(error);
+
+  if (payload.port_count !== undefined) {
+    const portCount = Math.max(1, Number(payload.port_count));
+    await syncOdpPorts(id, portCount);
+  }
+
+  const ports = await listPortsForOdp(id);
+  return mapOdp(data as Record<string, unknown>, ports);
+}
+
+export async function deleteOdp(id: string) {
+  const { error } = await getSupabase().from("odps").delete().eq("id", id);
+  throwIfWriteError(error);
+}
+
+export async function updateOdpPort(
+  id: string,
+  payload: { status?: OdpPortStatus; label?: string | null },
+): Promise<OdpPort> {
+  const body: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+  };
+  if (payload.status !== undefined) body.status = payload.status;
+  if (payload.label !== undefined) body.label = payload.label;
+
+  const { data, error } = await getSupabase()
+    .from("odp_ports")
+    .update(body)
+    .eq("id", id)
+    .select("*")
+    .single();
+  throwIfWriteError(error);
+  return mapOdpPort(data as Record<string, unknown>);
 }
 
 export type { Customer };
